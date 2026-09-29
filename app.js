@@ -8,6 +8,7 @@
   const fmtShort = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
   const fmtLong = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
   const CATS = ["bleu", "vert", "ambre", "rose", "gris"];
+  const DEFAULT_LABELS = { bleu: "Travail", vert: "Sport & santé", ambre: "Admin", rose: "Rendez-vous", gris: "Perso" };
   const KINDS = ["block", "task"];
   const RECURS = ["none", "daily", "weekly", "monthly"];
   const LAST = 23 * 60 + 59;
@@ -24,6 +25,18 @@
   let email = null;
   let statusMsg = "", statusWarn = false;
   let sel = todayDate();
+  let labels = { ...DEFAULT_LABELS };   // nom de chaque couleur
+  let focusCat = null;                  // catégorie mise en avant via la légende
+  const catLabel = c => labels[c] || DEFAULT_LABELS[c] || c;
+  /** Garde des noms propres : 30 caractères max, nom par défaut si vide. */
+  function cleanLabels(raw) {
+    const out = { ...DEFAULT_LABELS };
+    if (raw && typeof raw === "object") for (const c of CATS) {
+      const v = typeof raw[c] === "string" ? raw[c].trim().slice(0, 30) : "";
+      if (v) out[c] = v;
+    }
+    return out;
+  }
 
   // ------------------------------------------------ Écritures en file
   // Une écriture à la fois par élément ; `pending` évite qu'un rechargement
@@ -69,18 +82,18 @@
     const d = n => ds(addDays(mon, n));
     const today = ds(new Date());
     const mk = o => ({ id: window.newId(), done: {}, skipped: {}, ...o });
-    const reading = mk({ title: "Lire 20 pages", kind: "task", start: d(0), recur: "daily", cat: "vert" });
+    const reading = mk({ title: "Lire 20 pages", kind: "task", start: d(0), recur: "daily", cat: "gris" });
     const plan = mk({ title: "Planifier demain", kind: "task", start: d(0), from: "21:00", to: "21:15", recur: "daily", cat: "ambre" });
     for (let i = 0; i < 7; i++) { const day = d(i); if (day < today) { reading.done[day] = true; if (i % 3 !== 2) plan.done[day] = true; } }
     return [
       mk({ title: "Deep work", kind: "block", start: d(0), from: "09:00", to: "11:00", recur: "weekly", days: [0, 1, 2, 3, 4], cat: "bleu" }),
       mk({ title: "Point d'équipe", kind: "block", start: d(0), from: "11:30", to: "12:00", recur: "weekly", days: [0, 3], cat: "rose" }),
-      mk({ title: "Cours d'anglais", kind: "block", start: d(2), from: "14:00", to: "15:30", recur: "weekly", days: [2], cat: "ambre" }),
+      mk({ title: "Cours d'anglais", kind: "block", start: d(2), from: "14:00", to: "15:30", recur: "weekly", days: [2], cat: "rose" }),
       mk({ title: "Sport", kind: "block", start: d(1), from: "18:30", to: "19:30", recur: "weekly", days: [1, 3, 5], cat: "vert" }),
       mk({ title: "Appeler le comptable", kind: "task", start: d(2), from: "16:00", to: "16:30", recur: "none", cat: "ambre" }),
-      mk({ title: "Envoyer la facture", kind: "task", start: d(2), from: "16:15", to: "16:45", recur: "none", cat: "rose" }),
+      mk({ title: "Envoyer la facture", kind: "task", start: d(2), from: "16:15", to: "16:45", recur: "none", cat: "ambre" }),
       mk({ title: "Revue de la semaine", kind: "task", start: d(6), from: "18:00", to: "18:45", recur: "weekly", days: [6], cat: "bleu" }),
-      mk({ title: "Faire les comptes du mois", kind: "task", start: d(4), recur: "monthly", cat: "gris" }),
+      mk({ title: "Faire les comptes du mois", kind: "task", start: d(4), recur: "monthly", cat: "ambre" }),
       mk({ title: "Courses", kind: "task", start: d(5), recur: "weekly", days: [5], cat: "gris" }),
       reading, plan
     ];
@@ -176,6 +189,8 @@
       return { d, s, when, timed: layout(timed), untimed };
     });
     endH = Math.min(endH, 24);
+    renderLegend(perDay, days.length);
+    const dim = it => (focusCat && it.cat !== focusCat ? " dim" : "");
     const HOUR = hourPx();
     const y = m => (m - startH * 60) / 60 * HOUR;
 
@@ -192,7 +207,7 @@
       if (!p.untimed.length) h += `<li class="empty">—</li>`;
       for (const it of p.untimed) {
         const dn = isDone(it, p.s);
-        h += `<li class="${dn ? "done" : ""}" style="--cat:var(--cat-${esc(it.cat || "gris")})">
+        h += `<li class="${dn ? "done" : ""}${dim(it)}" style="--cat:var(--cat-${esc(it.cat || "gris")})">
           <button class="chk" role="checkbox" aria-checked="${dn}" aria-label="Marquer « ${esc(it.title)} » comme faite" data-toggle="${esc(it.id)}" data-day="${p.s}">${CHECK}</button>
           <button class="t-title" data-open="${esc(it.id)}" data-day="${p.s}">${esc(it.title)}</button>
           ${it.recur && it.recur !== "none" ? `<span class="rec" title="${esc(recurText(it))}">↻</span>` : ""}
@@ -212,8 +227,8 @@
         const top = y(s), ht = Math.max((en - s) / 60 * HOUR - 2, 20);
         const n = e._n || 1;
         const dn = e.kind === "task" && isDone(e, p.s);
-        const tip = `${e.title} · ${e.from}–${e.to}`;
-        h += `<div class="ev ${e.kind === "task" ? "task" : "block"}${ht < 40 ? " short" : ""}${dn ? " done" : ""}" role="button" tabindex="0"
+        const tip = `${e.title} · ${e.from}–${e.to} · ${catLabel(e.cat)}`;
+        h += `<div class="ev ${e.kind === "task" ? "task" : "block"}${ht < 40 ? " short" : ""}${dn ? " done" : ""}${dim(e)}" role="button" tabindex="0"
           data-open="${esc(e.id)}" data-day="${p.s}" title="${esc(tip)}"
           style="--cat:var(--cat-${esc(e.cat || "bleu")});top:${top + 1}px;height:${ht}px;left:calc(${e._lane} / ${n} * 100% + 2px);width:calc(100% / ${n} - 4px)"
           aria-label="${esc(e.title)}, ${e.from} à ${e.to}">
@@ -227,6 +242,26 @@
     board.dataset.start = startH;
     renderBar();
   }
+
+  /** Légende : une pastille par catégorie avec le temps bloqué sur la période affichée.
+   *  Un clic met la catégorie en avant (les autres s'effacent), un second clic annule. */
+  function renderLegend(perDay, nDays) {
+    const mins = Object.fromEntries(CATS.map(c => [c, 0]));
+    for (const p of perDay) for (const e of p.timed) if (e.kind === "block") mins[e.cat] = (mins[e.cat] || 0) + toMin(e.to) - toMin(e.from);
+    const fmtH = m => { const h = Math.floor(m / 60), r = m % 60; return r ? `${h} h ${pad(r)}` : `${h} h`; };
+    const period = nDays === 1 ? "ce jour" : "cette semaine";
+    $("legend").innerHTML = CATS.map(c => `
+      <button class="cat-item" data-cat="${c}" aria-pressed="${focusCat === c}" style="--cat:var(--cat-${c})"
+        title="${esc(catLabel(c))} : ${mins[c] ? fmtH(mins[c]) + " bloquées " + period : "aucun créneau " + period}">
+        <span class="swatch" aria-hidden="true"></span><b>${esc(catLabel(c))}</b>${mins[c] ? `<span class="hrs">${fmtH(mins[c])}</span>` : ""}
+      </button>`).join("") + `<button class="linkbtn" id="renameCats">Renommer</button>`;
+  }
+  $("legend").addEventListener("click", e => {
+    if (e.target.closest("#renameCats")) return openCats();
+    const b = e.target.closest("[data-cat]"); if (!b) return;
+    focusCat = focusCat === b.dataset.cat ? null : b.dataset.cat;
+    render();
+  });
 
   /** Amène la ligne « maintenant » dans le tiers haut de l'écran si elle n'est pas visible. */
   function scrollToNow() {
@@ -296,7 +331,7 @@
 
   // ------------------------------------------------------------ Menu ⋯
   const menuBtn = $("menuBtn"), menu = $("menu");
-  const menuItems = () => [...menu.querySelectorAll('[role="menuitem"]:not([hidden])')];
+  const menuItems = () => [...menu.querySelectorAll('[role^="menuitem"]:not([hidden])')];
   function openMenu() {
     menu.hidden = false; menuBtn.setAttribute("aria-expanded", "true");
     const first = menuItems()[0]; if (first) first.focus();
@@ -365,6 +400,7 @@
   async function resetDemo() {
     closeMenu();
     await Store.clear();
+    labels = { ...DEFAULT_LABELS }; focusCat = null;
     items = sample();
     await Store.saveMany(items.map(clone));
     sel = todayDate();
@@ -379,7 +415,10 @@
   // ------------------------------------------------------ Formulaire
   const form = $("form");
   $("f-days").innerHTML = DN.map((n, i) => `<label title="${DL[i]}"><input type="checkbox" id="f-d${i}" value="${i}"><span>${n.slice(0, 1)}</span></label>`).join("");
-  $("f-cats").innerHTML = CATS.map(c => `<label title="${c}" style="--cat:var(--cat-${c})"><input type="radio" name="cat" id="f-cat-${c}" value="${c}"><span></span></label>`).join("");
+  const buildCatOptions = () => {
+    $("f-cats").innerHTML = CATS.map(c => `<label style="--cat:var(--cat-${c})"><input type="radio" name="cat" id="f-cat-${c}" value="${c}"><span>${esc(catLabel(c))}</span></label>`).join("");
+  };
+  buildCatOptions();
   const durChips = [...$("f-durs").querySelectorAll("[data-dur]")];
   let editing = null;
 
@@ -427,7 +466,8 @@
     $("f-recur").value = it ? (it.recur || "none") : "none";
     const dset = it && it.days ? it.days : [];
     for (let i = 0; i < 7; i++) $("f-d" + i).checked = dset.includes(i);
-    $("f-cat-" + ((it && it.cat) || (kind === "block" ? "bleu" : "ambre"))).checked = true;
+    buildCatOptions();
+    $("f-cat-" + ((it && it.cat) || focusCat || (kind === "block" ? "bleu" : "ambre"))).checked = true;
     $("f-delete").hidden = !it; disarm($("f-delete"), "Supprimer la série");
     $("formErr").hidden = true;
     syncForm();
@@ -485,7 +525,8 @@
     $("det").style.setProperty("--cat", `var(--cat-${it.cat || "bleu"})`);
     $("detMeta").innerHTML = `
       <span><b>${esc(fmtLong.format(parse(day)))}</b>${it.from ? ` · ${it.from} → ${it.to}` : " · sans heure"}</span>
-      <span>${it.kind === "block" ? "Créneau bloqué" : "Tâche"} · ${esc(recurText(it))}</span>
+      <span>${it.kind === "block" ? "Créneau bloqué" : "Tâche"} · ${esc(catLabel(it.cat))}</span>
+      <span>${esc(recurText(it))}</span>
       ${it.kind === "task" ? `<span>État ce jour : <b>${isDone(it, day) ? "faite" : "à faire"}</b></span>` : ""}`;
     const rec = it.recur && it.recur !== "none";
     $("d-skip").hidden = !rec;
@@ -507,11 +548,75 @@
     removeItem(cur.id); closeDetail();
   };
 
+  // ------------------------------------------------ Catégories
+  function fillCatFields(src) {
+    $("catFields").innerHTML = CATS.map(c => `
+      <label style="--cat:var(--cat-${c})"><span class="dot" aria-hidden="true"></span>
+        <input class="inp" id="c-${c}" maxlength="30" autocomplete="off" value="${esc(src[c])}" aria-label="Nom de la catégorie ${c}">
+      </label>`).join("");
+  }
+  function openCats() {
+    closeMenu();
+    fillCatFields(labels);
+    $("catErr").hidden = true;
+    $("catScrim").hidden = false;
+    setTimeout(() => $("c-bleu").focus(), 30);
+  }
+  function closeCats() { $("catScrim").hidden = true; }
+  $("m-cats").onclick = openCats;
+  $("c-cancel").onclick = closeCats;
+  $("c-default").onclick = () => fillCatFields(DEFAULT_LABELS);
+  $("catScrim").addEventListener("mousedown", e => { if (e.target === $("catScrim")) closeCats(); });
+  $("catForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const raw = Object.fromEntries(CATS.map(c => [c, $("c-" + c).value]));
+    const next = cleanLabels(raw);
+    labels = next;
+    closeCats();
+    render();
+    pending++;
+    try { await Store.saveSettings({ catLabels: next }); setStatus("Catégories enregistrées."); }
+    catch (err) { setStatus(err.message || "Enregistrement impossible.", true); }
+    finally { pending--; }
+  });
+  async function loadSettings() {
+    try {
+      const s = await Store.getSettings();
+      labels = cleanLabels(s && s.catLabels);
+    } catch (err) {
+      labels = { ...DEFAULT_LABELS };
+      setStatus(err.message, true);
+    }
+  }
+
+  // ------------------------------------------------------------ Thème
+  // Réglage propre à chaque appareil : Auto (suit le système), Clair ou Sombre.
+  const THEME_KEY = "semainier.theme";
+  const darkOS = matchMedia("(prefers-color-scheme: dark)");
+  const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];
+  const themeDefaults = themeMetas.map(m => m.content);
+  function currentTheme() {
+    const t = document.documentElement.getAttribute("data-theme");
+    return t === "light" || t === "dark" ? t : "auto";
+  }
+  function applyTheme(t) {
+    const root = document.documentElement;
+    if (t === "light" || t === "dark") root.setAttribute("data-theme", t); else root.removeAttribute("data-theme");
+    try { if (t === "auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, t); } catch (e) {}
+    // Couleur de la barre du navigateur mobile, alignée sur le thème affiché.
+    const paper = getComputedStyle(root).getPropertyValue("--paper").trim();
+    themeMetas.forEach((m, i) => { m.content = t === "auto" ? themeDefaults[i] : paper; });
+    menu.querySelectorAll("[data-theme-set]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.themeSet === t)));
+  }
+  menu.querySelectorAll("[data-theme-set]").forEach(b => { b.onclick = () => applyTheme(b.dataset.themeSet); });
+  applyTheme(currentTheme());
+
   // ------------------------------------------------------ Clavier
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
       if (!$("formScrim").hidden) closeForm();
       else if (!$("detScrim").hidden) closeDetail();
+      else if (!$("catScrim").hidden) closeCats();
       else closeMenu(true);
       return;
     }
@@ -538,6 +643,7 @@
       } else items = list || [];
       loaded = true;
       if (!silent || statusWarn) setStatus("");
+      await loadSettings();
       render();
     } catch (err) {
       loaded = true;

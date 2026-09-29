@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Semainier">
 <title>Semainier</title>
+<script src="theme.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -56,7 +57,17 @@
       <div class="menu" id="menu" role="menu" hidden>
         <button role="menuitem" id="m-export">Exporter mon planning (JSON)</button>
         <button role="menuitem" id="m-import">Importer un fichier JSON</button>
+        <button role="menuitem" id="m-cats">Renommer les catégories</button>
         <button role="menuitem" id="m-reset" hidden>Réinitialiser la démo</button>
+        <div class="sep" role="separator"></div>
+        <div class="menu-sec">
+          <span class="lbl" id="themeLbl">Thème</span>
+          <div class="theme-seg" role="group" aria-labelledby="themeLbl">
+            <button role="menuitemradio" data-theme-set="auto" aria-checked="true">Auto</button>
+            <button role="menuitemradio" data-theme-set="light" aria-checked="false">Clair</button>
+            <button role="menuitemradio" data-theme-set="dark" aria-checked="false">Sombre</button>
+          </div>
+        </div>
         <div class="sep" role="separator"></div>
         <div class="who" id="m-who"></div>
         <button role="menuitem" id="m-exit" hidden>Quitter la démo</button>
@@ -67,6 +78,7 @@
   </header>
 
   <div class="bar" id="bar" aria-live="polite"></div>
+  <div class="legend" id="legend" role="group" aria-label="Catégories"></div>
   <div class="strip" id="strip" role="group" aria-label="Jour affiché"></div>
   <div class="board" id="board"></div>
 
@@ -121,7 +133,7 @@
       <div class="days" id="f-days"></div>
     </div>
     <div class="field">
-      <span class="lbl">Couleur</span>
+      <span class="lbl">Catégorie</span>
       <div class="cats" id="f-cats"></div>
     </div>
     <p class="err" id="formErr" hidden></p>
@@ -145,6 +157,21 @@
       <button class="btn primary" id="d-toggle" hidden></button>
     </div>
   </div>
+</div>
+
+<!-- Noms des catégories -->
+<div class="scrim" id="catScrim" hidden>
+  <form class="sheet" id="catForm" novalidate>
+    <h2>Catégories</h2>
+    <p class="hint">Donne un nom à chaque couleur. Il apparaît dans la légende, le formulaire et le détail de chaque élément.</p>
+    <div class="cat-fields" id="catFields"></div>
+    <p class="err" id="catErr" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn spacer" id="c-default">Noms par défaut</button>
+      <button type="button" class="btn" id="c-cancel">Annuler</button>
+      <button type="submit" class="btn primary">Enregistrer</button>
+    </div>
+  </form>
 </div>
 
 <script src="vendor/supabase-2.117.2.js"></script>

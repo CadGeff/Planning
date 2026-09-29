@@ -80,3 +80,58 @@ create policy "items: suppression de ses lignes" on public.items
 -- Les visiteurs non connectés n'ont aucun droit sur la table.
 revoke all on public.items from anon;
 grant select, insert, update, delete on public.items to authenticated;
+
+-- ============================================================ Réglages
+-- Une ligne par utilisateur : noms des catégories (couleurs), synchronisés entre appareils.
+create table if not exists public.settings (
+  user_id     uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  cat_labels  jsonb not null default '{}'::jsonb
+              check (jsonb_typeof(cat_labels) = 'object' and pg_column_size(cat_labels) < 4096),
+  updated_at  timestamptz not null default now()
+);
+
+comment on table public.settings is 'Semainier : réglages synchronisés de chaque utilisateur.';
+comment on column public.settings.cat_labels is 'Nom de chaque couleur : { "bleu": "Travail", … }.';
+
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists settings_touch_updated_at on public.settings;
+create trigger settings_touch_updated_at
+  before update on public.settings
+  for each row execute function public.touch_updated_at();
+
+alter table public.settings enable row level security;
+
+drop policy if exists "settings: lecture de sa ligne"      on public.settings;
+drop policy if exists "settings: création de sa ligne"     on public.settings;
+drop policy if exists "settings: modification de sa ligne" on public.settings;
+drop policy if exists "settings: suppression de sa ligne"  on public.settings;
+
+create policy "settings: lecture de sa ligne" on public.settings
+  for select to authenticated
+  using ((select auth.uid()) = user_id);
+
+create policy "settings: création de sa ligne" on public.settings
+  for insert to authenticated
+  with check ((select auth.uid()) = user_id);
+
+create policy "settings: modification de sa ligne" on public.settings
+  for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+create policy "settings: suppression de sa ligne" on public.settings
+  for delete to authenticated
+  using ((select auth.uid()) = user_id);
+
+revoke all on public.settings from anon;
+grant select, insert, update, delete on public.settings to authenticated;

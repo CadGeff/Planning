@@ -11,6 +11,7 @@
  *   saveMany(items)
  *   remove(id)
  *   clear()        (local et démo : efface tout)
+ *   getSettings() -> { catLabels } ou null ; saveSettings({ catLabels })
  *
  * Forme d'un élément côté application :
  *   { id, title, kind: "block"|"task", start: "AAAA-MM-JJ", from?: "HH:MM", to?: "HH:MM",
@@ -57,7 +58,15 @@
     },
     async clear() {
       this._items = null;
-      try { localStorage.removeItem(key); } catch (e) {}
+      try { localStorage.removeItem(key); localStorage.removeItem(key + ".settings"); } catch (e) {}
+    },
+    async getSettings() {
+      try { const raw = localStorage.getItem(key + ".settings"); return raw ? JSON.parse(raw) : null; }
+      catch (e) { return null; }
+    },
+    async saveSettings(s) {
+      try { localStorage.setItem(key + ".settings", JSON.stringify(s)); }
+      catch (e) { throw new Error("Le navigateur refuse d'enregistrer (navigation privée ou stockage plein)."); }
     },
     _write() {
       try { localStorage.setItem(key, JSON.stringify(this._items || [])); }
@@ -117,7 +126,9 @@
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
     });
     const signedOutHandlers = [];
-    client.auth.onAuthStateChange(event => {
+    let uid = null;
+    client.auth.onAuthStateChange((event, session) => {
+      uid = session && session.user ? session.user.id : null;
       if (event === "SIGNED_OUT") signedOutHandlers.forEach(fn => fn());
     });
 
@@ -126,12 +137,29 @@
       async init() {
         const { data } = await client.auth.getSession();
         const s = data && data.session;
+        uid = s && s.user ? s.user.id : null;
         return { signedIn: !!s, email: s && s.user && s.user.email };
       },
       async signIn(email, password) {
         const { data, error } = await client.auth.signInWithPassword({ email, password });
         if (error) throw frenchError(error);
+        uid = data.user && data.user.id;
         return { email: data.user && data.user.email };
+      },
+      /** Réglages synchronisés (noms des catégories). null si rien n'est enregistré. */
+      async getSettings() {
+        const { data, error } = await client.from("settings").select("cat_labels").maybeSingle();
+        if (error) {
+          if (/settings|PGRST205|42P01|schema cache/i.test(`${error.code} ${error.message}`)) {
+            throw new Error("Noms des catégories non synchronisés : relance supabase/schema.sql dans le SQL Editor de Supabase.");
+          }
+          throw frenchError(error);
+        }
+        return data ? { catLabels: data.cat_labels || {} } : null;
+      },
+      async saveSettings(s) {
+        const { error } = await client.from("settings").upsert({ user_id: uid, cat_labels: s.catLabels || {} }, { onConflict: "user_id" });
+        if (error) throw frenchError(error);
       },
       async signOut() { await client.auth.signOut(); },
       onSignedOut(fn) { signedOutHandlers.push(fn); },

@@ -25,10 +25,12 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Tâches à cocher**, avec ou sans heure. Les tâches sans heure vont dans la ligne « À faire » du jour.
 - **Récurrence** quotidienne, hebdomadaire (jours au choix) ou mensuelle. Le 31 retombe sur le dernier jour des mois courts.
 - **Cocher ne vaut que pour le jour même** : l'occurrence suivante revient vierge. On peut aussi retirer un seul jour d'une série sans toucher au reste.
+- **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps bloqué par catégorie sur la semaine, et un clic sur une catégorie efface les autres. Les noms sont modifiables et synchronisés entre appareils.
 - **Repères visuels** : jours passés atténués, colonne du jour, ligne de l'heure actuelle, compteur des tâches du jour.
+- **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
 - **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine, <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
 - **Export et import JSON** pour sauvegarder ou migrer ses données.
-- **Application installable (PWA)** : icône sur l'écran d'accueil, ouverture hors connexion, thème clair ou sombre selon le système.
+- **Application installable (PWA)** : icône sur l'écran d'accueil, ouverture hors connexion.
 
 | Mode sombre | Mobile |
 |---|---|
@@ -57,7 +59,7 @@ flowchart LR
     ST -->|"démo ou config vide"| LS[("localStorage")]
     ST -->|"supabase-js<br/>jeton JWT"| AUTH["Supabase Auth"]
     ST -->|REST| API["API PostgREST"]
-    API --> PG[("Postgres<br/>table items + RLS")]
+    API --> PG[("Postgres<br/>items, settings + RLS")]
 ```
 
 **Une règle, pas des occurrences.** La base stocke chaque élément une seule fois, avec sa règle de répétition. Les occurrences sont calculées à l'affichage par `recurrence.js`, un module de fonctions pures couvert par des tests. Deux tableaux JSON par élément gardent les exceptions : `done`, pour les jours cochés, et `skipped`, pour les jours retirés de la série.
@@ -77,13 +79,13 @@ flowchart LR
 | `days` | `smallint[]` | Jours actifs en hebdomadaire, de 0 (lundi) à 6 (dimanche) |
 | `done`, `skipped` | `jsonb` | Occurrences cochées ou retirées : `{ "AAAA-MM-JJ": true }` |
 
-Toutes ces contraintes sont vérifiées par Postgres lui-même (voir [`supabase/schema.sql`](supabase/schema.sql)).
+Une seconde table, `settings`, contient une ligne par utilisateur avec les noms des catégories (`cat_labels`), sous la même RLS. Toutes ces contraintes sont vérifiées par Postgres lui-même (voir [`supabase/schema.sql`](supabase/schema.sql)).
 
 ## Sécurité
 
 Le dépôt est public et la clé Supabase est visible dans le navigateur, comme dans toute application front-end. La sécurité repose donc entièrement sur le serveur :
 
-- **Row Level Security** sur la table `items` : chaque requête est filtrée par `auth.uid() = user_id`, en lecture comme en écriture. Un utilisateur authentifié ne peut ni lire, ni modifier, ni s'approprier la ligne d'un autre. Le rôle `anon` n'a aucun droit sur la table.
+- **Row Level Security** sur les tables `items` et `settings` : chaque requête est filtrée par `auth.uid() = user_id`, en lecture comme en écriture. Un utilisateur authentifié ne peut ni lire, ni modifier, ni s'approprier la ligne d'un autre. Le rôle `anon` n'a aucun droit sur ces tables.
 - **Inscriptions désactivées** : le seul compte est créé à la main dans le tableau de bord Supabase.
 - **Seule la clé publishable est exposée.** L'application refuse de démarrer en mode Supabase si `config.js` contient une clé à privilèges (`sb_secret_…` ou `service_role`).
 - **Content Security Policy** stricte : scripts, styles et polices servis uniquement par le site, requêtes réseau limitées à `*.supabase.co`, pas de `<base>`, de formulaire externe ni d'objet embarqué.
@@ -96,7 +98,7 @@ Le dépôt est public et la clé Supabase est visible dans le navigateur, comme 
 ### 1. Base de données
 
 1. Créer un projet sur [supabase.com](https://supabase.com), de préférence dans une région européenne.
-2. Dans **SQL Editor**, exécuter [`supabase/schema.sql`](supabase/schema.sql). Le script est idempotent : on peut le relancer sans risque.
+2. Dans **SQL Editor**, exécuter [`supabase/schema.sql`](supabase/schema.sql). Le script est idempotent : on peut le relancer sans risque, et il faut le faire après chaque mise à jour qui le modifie.
 3. Dans **Authentication → Sign In / Providers**, désactiver *Allow new users to sign up*.
 4. Dans **Authentication → Users → Add user**, créer son compte en cochant *Auto Confirm User*.
 
@@ -135,11 +137,12 @@ index.html            page unique, CSP
 styles.css            thème clair et sombre, mise en page
 app.js                interface : rendu, formulaires, raccourcis, synchronisation
 recurrence.js         dates et règles de récurrence (fonctions pures)
+theme.js              applique le thème choisi avant l'affichage
 store.js              stockage : Supabase, local ou démo
 config.js             URL et clé publishable Supabase
 sw.js                 service worker
 manifest.webmanifest  installation sur l'écran d'accueil
-supabase/schema.sql   table, contraintes, RLS
+supabase/schema.sql   tables, contraintes, RLS
 tests/                tests node:test
 vendor/               supabase-js 2.117.2 (MIT)
 fonts/                Bricolage Grotesque, Instrument Sans, IBM Plex Mono (SIL OFL)

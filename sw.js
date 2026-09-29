@@ -4,7 +4,7 @@
  * (autre origine) ne passent jamais par ce cache.
  * Pense à incrémenter CACHE quand tu ajoutes ou renommes un fichier de SHELL.
  */
-const CACHE = "semainier-v2";
+const CACHE = "semainier-v3";
 const SHELL = [
   "./",
   "index.html",
@@ -13,6 +13,7 @@ const SHELL = [
   "recurrence.js",
   "store.js",
   "app.js",
+  "theme.js",
   "vendor/supabase-2.117.2.js",
   "manifest.webmanifest",
   "icons/icon.svg",
