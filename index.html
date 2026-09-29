@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#F5F6FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10131C" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Semainier">
+<title>Semainier</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preload" href="fonts/instrument-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Écran de connexion (mode Supabase uniquement) -->
+<main class="login" id="login" hidden>
+  <form id="loginForm" novalidate>
+    <h1>Semainier</h1>
+    <p class="sub">Connecte-toi pour retrouver ton planning.</p>
+    <div class="field">
+      <label for="l-email">E-mail</label>
+      <input class="inp" type="email" id="l-email" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <label for="l-pass">Mot de passe</label>
+      <input class="inp" type="password" id="l-pass" autocomplete="current-password" required>
+    </div>
+    <p class="err" id="loginErr" hidden></p>
+    <button type="submit" class="btn primary" id="loginBtn">Se connecter</button>
+  </form>
+</main>
+
+<!-- Application -->
+<div class="app" id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <h1>Semainier</h1>
+      <span class="wk" id="wk"></span>
+    </div>
+    <nav class="nav" aria-label="Navigation">
+      <button class="btn icon" id="prev" aria-label="Précédent">‹</button>
+      <button class="btn" id="today">Aujourd'hui</button>
+      <button class="btn icon" id="next" aria-label="Suivant">›</button>
+    </nav>
+    <button class="btn primary" id="add">+ Ajouter</button>
+  </header>
+
+  <div class="bar" id="bar" aria-live="polite"></div>
+  <div class="strip" id="strip" role="group" aria-label="Jour affiché"></div>
+  <div class="board" id="board"></div>
+
+  <footer class="foot">
+    <p class="hint">Clique sur une case vide de la grille pour bloquer un créneau à cette heure.</p>
+    <div class="tools">
+      <button class="btn" id="exportBtn">Exporter (JSON)</button>
+      <button class="btn" id="importBtn">Importer</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <button class="btn" id="logoutBtn" hidden>Se déconnecter</button>
+    </div>
+  </footer>
+</div>
+
+<!-- Formulaire création / modification -->
+<div class="scrim" id="formScrim" hidden>
+  <form class="sheet" id="form" novalidate>
+    <h2 id="formTitle">Nouvel élément</h2>
+    <div class="field">
+      <label for="f-title">Intitulé</label>
+      <input class="inp" id="f-title" autocomplete="off" placeholder="Ex. Prospection, sport, courses…" maxlength="120">
+    </div>
+    <div class="field">
+      <span class="lbl">Type</span>
+      <div class="seg">
+        <label><input type="radio" name="kind" id="f-kind-block" value="block"><span>Créneau bloqué</span></label>
+        <label><input type="radio" name="kind" id="f-kind-task" value="task"><span>Tâche à cocher</span></label>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="f-date">Date (1re fois)</label><input class="inp" type="date" id="f-date"></div>
+      <div class="field"><label for="f-from">Début</label><input class="inp" type="time" id="f-from" step="900"></div>
+      <div class="field"><label for="f-to">Fin</label><input class="inp" type="time" id="f-to" step="900"></div>
+    </div>
+    <p class="hint" id="timeHint"></p>
+    <div class="field">
+      <label for="f-recur">Répétition</label>
+      <select class="inp" id="f-recur">
+        <option value="none">Une seule fois</option>
+        <option value="daily">Chaque jour</option>
+        <option value="weekly">Chaque semaine</option>
+        <option value="monthly">Chaque mois (même date)</option>
+      </select>
+    </div>
+    <div class="field" id="daysField" hidden>
+      <span class="lbl">Jours</span>
+      <div class="days" id="f-days"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Couleur</span>
+      <div class="cats" id="f-cats"></div>
+    </div>
+    <p class="err" id="formErr" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn danger spacer" id="f-delete" hidden>Supprimer la série</button>
+      <button type="button" class="btn" id="f-cancel">Annuler</button>
+      <button type="submit" class="btn primary">Enregistrer</button>
+    </div>
+  </form>
+</div>
+
+<!-- Détail d'une occurrence -->
+<div class="scrim" id="detScrim" hidden>
+  <div class="sheet" id="det" role="dialog" aria-modal="true" aria-labelledby="detTitle">
+    <div class="detail-head"><span class="dot" id="detDot"></span><h2 id="detTitle"></h2></div>
+    <div class="meta" id="detMeta"></div>
+    <div class="actions">
+      <button class="btn danger spacer" id="d-del"></button>
+      <button class="btn" id="d-skip" hidden>Retirer ce jour</button>
+      <button class="btn" id="d-edit">Modifier</button>
+      <button class="btn primary" id="d-toggle" hidden></button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/supabase-2.117.2.js"></script>
+<script src="config.js"></script>
+<script src="recurrence.js"></script>
+<script src="store.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
