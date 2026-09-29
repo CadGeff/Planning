@@ -1,7 +1,7 @@
 /* Semainier — couche de stockage.
  *
- * Deux implémentations avec la même interface :
- *   mode           "local" | "supabase"
+ * Trois modes avec la même interface :
+ *   mode           "local" (config vide) | "demo" (URL en #demo) | "supabase"
  *   init()         -> { signedIn, email? }
  *   signIn(e, p)   (Supabase seulement)
  *   signOut()      (Supabase seulement)
@@ -10,6 +10,7 @@
  *   save(item)     crée ou remplace un élément
  *   saveMany(items)
  *   remove(id)
+ *   clear()        (local et démo : efface tout)
  *
  * Forme d'un élément côté application :
  *   { id, title, kind: "block"|"task", start: "AAAA-MM-JJ", from?: "HH:MM", to?: "HH:MM",
@@ -40,22 +41,26 @@
     } catch (e) { return false; }
   }
 
-  // ---------------------------------------------------------------- Local
-  const LS_KEY = "semainier.items.v1";
-  const LocalStore = {
-    mode: "local",
+  // ------------------------------------------------- Local et démo
+  // Même code, clé de stockage différente : la démo ne touche jamais aux données locales.
+  const makeLocalStore = (mode, key) => ({
+    mode,
     _items: null,
     async init() { return { signedIn: true }; },
     async signIn() {}, async signOut() {}, onSignedOut() {},
     async list() {
       try {
-        const raw = localStorage.getItem(LS_KEY);
+        const raw = localStorage.getItem(key);
         this._items = raw ? JSON.parse(raw) : null;
       } catch (e) { this._items = null; }
       return this._items ? this._items.map(x => ({ ...x })) : null;
     },
+    async clear() {
+      this._items = null;
+      try { localStorage.removeItem(key); } catch (e) {}
+    },
     _write() {
-      try { localStorage.setItem(LS_KEY, JSON.stringify(this._items || [])); }
+      try { localStorage.setItem(key, JSON.stringify(this._items || [])); }
       catch (e) { throw new Error("Le navigateur refuse d'enregistrer (navigation privée ou stockage plein)."); }
     },
     async save(item) {
@@ -69,7 +74,7 @@
       this._items = (this._items || []).filter(x => x.id !== id);
       this._write();
     }
-  };
+  });
 
   // ------------------------------------------------------------- Supabase
   const COLS = "id,title,kind,start_date,time_from,time_to,recur,days,cat,done,skipped";
@@ -152,9 +157,13 @@
   }
 
   // -------------------------------------------------------------- Choix
-  let store = LocalStore;
+  // #demo dans l'URL : démo publique, données d'exemple dans le navigateur, aucun appel à Supabase.
+  const DEMO = location.hash === "#demo";
+  let store = makeLocalStore("local", "semainier.items.v1");
   let configError = null;
-  if (cfg.supabaseUrl || cfg.supabaseKey) {
+  if (DEMO) {
+    store = makeLocalStore("demo", "semainier.demo.v1");
+  } else if (cfg.supabaseUrl || cfg.supabaseKey) {
     if (!cfg.supabaseUrl || !cfg.supabaseKey) configError = "config.js : il faut à la fois supabaseUrl et supabaseKey.";
     else if (isPrivilegedKey(cfg.supabaseKey)) configError = "config.js contient une clé secrète (service_role / sb_secret). Remplace-la par la clé publishable ou anon, et régénère la clé secrète dans Supabase.";
     else if (!window.supabase) configError = "Le client Supabase n'a pas pu être chargé (vendor/).";

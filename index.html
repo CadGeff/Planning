@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
+<meta name="description" content="Semainier : planning perso en vue semaine, créneaux bloqués et tâches récurrentes.">
 <meta name="theme-color" content="#F5F6FB" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#10131C" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -33,6 +34,7 @@
     </div>
     <p class="err" id="loginErr" hidden></p>
     <button type="submit" class="btn primary" id="loginBtn">Se connecter</button>
+    <p class="alt">Simple visite ? <a href="#demo">Essayer la démo</a>, sans compte.</p>
   </form>
 </main>
 
@@ -44,11 +46,24 @@
       <span class="wk" id="wk"></span>
     </div>
     <nav class="nav" aria-label="Navigation">
-      <button class="btn icon" id="prev" aria-label="Précédent">‹</button>
-      <button class="btn" id="today">Aujourd'hui</button>
-      <button class="btn icon" id="next" aria-label="Suivant">›</button>
+      <button class="btn icon" id="prev" aria-label="Précédent" title="Précédent (←)">‹</button>
+      <button class="btn" id="today" title="Aujourd'hui (T)">Aujourd'hui</button>
+      <button class="btn icon" id="next" aria-label="Suivant" title="Suivant (→)">›</button>
     </nav>
-    <button class="btn primary" id="add">+ Ajouter</button>
+    <button class="btn primary" id="add" aria-label="Ajouter un élément" title="Nouvel élément (N)"><span aria-hidden="true">+</span><span class="add-label"> Ajouter</span></button>
+    <div class="menu-wrap">
+      <button class="btn icon" id="menuBtn" aria-label="Plus d'options" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">⋯</button>
+      <div class="menu" id="menu" role="menu" hidden>
+        <button role="menuitem" id="m-export">Exporter mon planning (JSON)</button>
+        <button role="menuitem" id="m-import">Importer un fichier JSON</button>
+        <button role="menuitem" id="m-reset" hidden>Réinitialiser la démo</button>
+        <div class="sep" role="separator"></div>
+        <div class="who" id="m-who"></div>
+        <button role="menuitem" id="m-exit" hidden>Quitter la démo</button>
+        <button role="menuitem" id="m-logout" class="danger-item" hidden>Se déconnecter</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
   </header>
 
   <div class="bar" id="bar" aria-live="polite"></div>
@@ -56,13 +71,8 @@
   <div class="board" id="board"></div>
 
   <footer class="foot">
-    <p class="hint">Clique sur une case vide de la grille pour bloquer un créneau à cette heure.</p>
-    <div class="tools">
-      <button class="btn" id="exportBtn">Exporter (JSON)</button>
-      <button class="btn" id="importBtn">Importer</button>
-      <input type="file" id="importFile" accept="application/json,.json" hidden>
-      <button class="btn" id="logoutBtn" hidden>Se déconnecter</button>
-    </div>
+    <p>Clique sur une case vide de la grille pour bloquer un créneau à cette heure.</p>
+    <p class="keys"><span><kbd>←</kbd> <kbd>→</kbd> semaine</span><span><kbd>T</kbd> aujourd'hui</span><span><kbd>N</kbd> nouvel élément</span></p>
   </footer>
 </div>
 
@@ -85,6 +95,16 @@
       <div class="field"><label for="f-date">Date (1re fois)</label><input class="inp" type="date" id="f-date"></div>
       <div class="field"><label for="f-from">Début</label><input class="inp" type="time" id="f-from" step="900"></div>
       <div class="field"><label for="f-to">Fin</label><input class="inp" type="time" id="f-to" step="900"></div>
+    </div>
+    <div class="field">
+      <span class="lbl" id="durLbl">Durée</span>
+      <div class="chips" id="f-durs" role="group" aria-labelledby="durLbl">
+        <button type="button" data-dur="15" aria-pressed="false">15 min</button>
+        <button type="button" data-dur="30" aria-pressed="false">30 min</button>
+        <button type="button" data-dur="60" aria-pressed="false">1 h</button>
+        <button type="button" data-dur="90" aria-pressed="false">1 h 30</button>
+        <button type="button" data-dur="120" aria-pressed="false">2 h</button>
+      </div>
     </div>
     <p class="hint" id="timeHint"></p>
     <div class="field">
