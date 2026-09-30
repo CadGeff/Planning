@@ -2,13 +2,13 @@
 
 Planning personnel en vue semaine, pensé comme une page de cahier : on y **bloque des créneaux** et on y **coche des tâches récurrentes** qui se remettent à zéro chaque jour, chaque semaine ou chaque mois.
 
-[![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-2D47C9)](https://cadgeff.github.io/Planning/#demo)
+[![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-2D47C9)](https://semainier-cadgeff.pages.dev/#demo)
 ![JavaScript sans framework](https://img.shields.io/badge/JavaScript-sans%20framework-1B2140)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-23946A)
 ![PWA](https://img.shields.io/badge/PWA-installable-C98712)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-737A94)](LICENSE)
 
-**[→ Essayer la démo](https://cadgeff.github.io/Planning/#demo)**, sans compte, avec des données d'exemple stockées dans votre navigateur.
+**[→ Essayer la démo](https://semainier-cadgeff.pages.dev/#demo)**, sans compte, avec des données d'exemple stockées dans votre navigateur.
 
 ![Vue semaine du Semainier](docs/apercu-clair.png)
 
@@ -43,7 +43,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 |---|---|---|
 | Interface | HTML, CSS et JavaScript natifs, sans framework ni build | Le projet tient en quelques fichiers lisibles, se déploie tel quel et n'a aucune dépendance à maintenir. |
 | Données et authentification | [Supabase](https://supabase.com) : Postgres, Auth, API REST | Postgres standard et open source, sécurisé par Row Level Security, exportable avec `pg_dump`, auto-hébergeable. |
-| Hébergement | GitHub Pages | Site statique gratuit, déployé à chaque push. |
+| Hébergement | Cloudflare Pages | Site statique gratuit, déployé à chaque push, avec de vrais en-têtes HTTP de sécurité (`_headers`). |
 | Hors connexion | Service worker, stratégie « réseau d'abord » | Toujours la dernière version en ligne, et l'interface s'ouvre quand même sans réseau. |
 | Ressources | `supabase-js` et polices copiés dans le dépôt | Aucun CDN tiers : pas de fuite d'adresse IP vers Google Fonts, pas de dépendance à la disponibilité d'un CDN. |
 
@@ -56,7 +56,7 @@ flowchart LR
         UI --> ST["store.js<br/>couche de stockage"]
         SW["sw.js<br/>cache hors connexion"]
     end
-    GH["GitHub Pages<br/>fichiers statiques"] -->|HTTPS| SW
+    CF["Cloudflare Pages<br/>fichiers statiques + en-têtes"] -->|HTTPS| SW
     ST -->|"démo ou config vide"| LS[("localStorage")]
     ST -->|"supabase-js<br/>jeton JWT"| AUTH["Supabase Auth"]
     ST -->|REST| API["API PostgREST"]
@@ -89,8 +89,8 @@ Le dépôt est public et la clé Supabase est visible dans le navigateur, comme 
 - **Row Level Security** sur les tables `items` et `settings` : chaque requête est filtrée par `auth.uid() = user_id`, en lecture comme en écriture. Un utilisateur authentifié ne peut ni lire, ni modifier, ni s'approprier la ligne d'un autre. Le rôle `anon` n'a aucun droit sur ces tables.
 - **Inscriptions désactivées** : le seul compte est créé à la main dans le tableau de bord Supabase.
 - **Seule la clé publishable est exposée.** L'application refuse de démarrer en mode Supabase si `config.js` contient une clé à privilèges (`sb_secret_…` ou `service_role`).
-- **Content Security Policy** stricte : scripts, styles et polices servis uniquement par le site, requêtes réseau limitées **au seul projet Supabase** de l'application (un script injecté ne pourrait pas exfiltrer vers un autre projet), pas de `<base>`, de formulaire externe ni d'objet embarqué.
-- **Anti-clickjacking** : la page refuse de s'afficher dans un cadre (`iframe`) d'un autre site.
+- **Content Security Policy** stricte, envoyée en en-tête HTTP : scripts, feuilles de style et polices servis uniquement par le site, aucun bloc `<style>` ni script inline, requêtes réseau limitées **au seul projet Supabase** de l'application (un script injecté ne pourrait pas exfiltrer vers un autre projet), pas de `<base>`, de formulaire externe ni d'objet embarqué.
+- **En-têtes HTTP** (`_headers`) : HSTS, `frame-ancestors 'none'` et `X-Frame-Options` contre le clickjacking (doublés d'une vérification en JavaScript), `nosniff`, `Permissions-Policy` qui coupe caméra, micro, géolocalisation et paiement, isolation `Cross-Origin-Opener-Policy` / `Cross-Origin-Resource-Policy`.
 - **Double authentification optionnelle, vérifiée côté serveur** : quand un facteur TOTP est actif, une politique RLS *restrictive* exige un jeton de niveau `aal2` sur `items` et `settings`. Un mot de passe volé donne une session `aal1`, qui ne lit ni n'écrit rien, même en appelant l'API directement. La fonction de contrôle vit dans un schéma `private` non exposé par l'API.
 - **Sessions** : changer de mot de passe ou activer la 2FA révoque les autres sessions ; « Se déconnecter » ferme la session sur tous les appareils.
 - **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, forme des objets JSON.
@@ -119,7 +119,7 @@ Un planning semble anodin, mais il décrit **où l'on est et quand** : horaires 
 | Session restée ouverte sur un appareil perdu | Déconnexion globale, révocation des autres sessions au changement de mot de passe et à l'activation de la 2FA. |
 | Injection de script (XSS) via un titre ou un import | Texte toujours échappé, imports revalidés, CSP sans script inline ni domaine tiers. |
 | Exfiltration par un script injecté malgré tout | `connect-src` limité au seul projet Supabase de l'application. |
-| Page affichée dans un cadre piégé (clickjacking) | Refus d'affichage dans une `iframe`. |
+| Page affichée dans un cadre piégé (clickjacking) | `frame-ancestors 'none'` et `X-Frame-Options: DENY` ; refus en JavaScript en secours. |
 | Bibliothèque compromise sur un CDN | Aucun CDN : `supabase-js` et les polices sont versionnés dans le dépôt. |
 | Clé secrète commitée par erreur | L'application refuse de démarrer avec une clé `service_role` / `sb_secret_`, et GitHub bloque le push des secrets connus. |
 
@@ -132,8 +132,9 @@ Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est un
 - **Appareil déverrouillé** : quiconque tient un téléphone ou un PC ouvert voit le planning. Le verrouillage de l'appareil reste la première ligne de défense.
 - **Jeton en `localStorage`** : un XSS réussi pourrait le lire. La CSP et l'échappement systématique rendent ce scénario très improbable, et le jeton expire au bout d'une heure.
 - **Données en clair côté serveur** : Supabase chiffre le disque, mais un administrateur du projet (ou de Supabase) peut lire les tables. Un chiffrement de bout en bout protégerait de ce cas, au prix de la recherche et de la synchro simple.
-- **En-têtes HTTP** : GitHub Pages ne permet pas d'en définir. La CSP passe par une balise `<meta>`, qui ne couvre pas `frame-ancestors` (d'où la protection en JavaScript), et il n'y a pas de `Permissions-Policy`. Un hébergement comme Cloudflare Pages lève cette limite.
-- **Chaîne d'approvisionnement** : une compromission du compte GitHub permettrait de servir un code modifié. Parade : mot de passe unique, 2FA sur GitHub et Supabase, pas de jeton d'accès inutile.
+- **Hébergeur** : Cloudflare voit passer les requêtes vers les fichiers du site (adresse IP, date), mais pas les données du planning, qui vont directement du navigateur à Supabase. Le site ne dépend d'aucune fonctionnalité propre à Cloudflare : il se redéploie ailleurs tel quel.
+- **Styles en attribut** : la grille positionne les créneaux avec des attributs `style`, d'où `style-src-attr 'unsafe-inline'`. Le risque est faible (pas de script possible par ce biais) ; les passer en CSSOM permettrait de retirer cette exception.
+- **Chaîne d'approvisionnement** : une compromission du compte GitHub ou Cloudflare permettrait de servir un code modifié. Parade : mots de passe uniques, 2FA sur GitHub, Cloudflare et Supabase, accès de Cloudflare limité à ce seul dépôt.
 
 ## Installer sa propre instance
 
@@ -157,9 +158,11 @@ window.SEMAINIER_CONFIG = {
 
 ### 3. Déploiement
 
-Pousser le dépôt sur GitHub, puis activer **Settings → Pages → Deploy from a branch → `main` / `(root)`**. L'application est servie à `https://<utilisateur>.github.io/<dépôt>/`.
+Sur [Cloudflare](https://dash.cloudflare.com), **Workers & Pages → Create application → Pages → Connect to Git**, choisir le dépôt, puis laisser *Framework preset* sur **None** et *Build command* vide. Chaque push sur `main` redéploie le site, servi à `https://<projet>.pages.dev`. Le fichier `_headers` y est appliqué automatiquement.
 
-N'importe quel hébergeur de fichiers statiques convient (Netlify, Cloudflare Pages, un simple nginx). Pour votre propre instance, remplacez l'adresse du projet Supabase dans la directive `connect-src` de la CSP (`index.html`).
+Pour votre propre instance, remplacez l'adresse du projet Supabase dans la directive `connect-src` de la CSP, à deux endroits : `index.html` et `_headers`. Puis, dans Supabase, **Authentication → URL Configuration**, renseignez l'adresse du site.
+
+N'importe quel hébergeur de fichiers statiques convient (Netlify, nginx, GitHub Pages…). Sans prise en charge de `_headers`, la CSP de `index.html` et la protection anti-cadre en JavaScript restent actives, mais les autres en-têtes sont perdus.
 
 ## Développement
 
@@ -176,6 +179,7 @@ Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHEL
 
 ```
 index.html            page unique, CSP
+_headers              en-têtes HTTP de sécurité (Cloudflare Pages)
 styles.css            thème clair et sombre, mise en page
 app.js                interface : rendu, formulaires, raccourcis, synchronisation
 recurrence.js         dates et règles de récurrence (fonctions pures)
