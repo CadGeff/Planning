@@ -1,7 +1,8 @@
 # En-têtes HTTP de sécurité, appliqués par Cloudflare Pages à chaque fichier servi.
 # Ce fichier n'est pas publié. La CSP reprend celle de index.html, avec en plus
-# frame-ancestors, qu'une balise <meta> ne peut pas porter. Les lignes « ! » retirent
-# des en-têtes ajoutés par défaut par Cloudflare (CORS ouvert, rapports d'erreurs réseau).
+# frame-ancestors, qu'une balise <meta> ne peut pas porter. « ! » retire un en-tête ajouté
+# par défaut par Cloudflare (ici le CORS ouvert). NEL et Report-To, eux, sont ajoutés par le
+# réseau Cloudflare après ce fichier et ne peuvent pas être retirés sur une adresse pages.dev.
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://igyoyutosvkbeeiriwyf.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'
   Strict-Transport-Security: max-age=63072000; includeSubDomains
@@ -12,5 +13,3 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   ! Access-Control-Allow-Origin
-  ! NEL
-  ! Report-To
