@@ -3,6 +3,8 @@
 Planning personnel en vue semaine, pensé comme une page de cahier : on y **bloque des créneaux** et on y **coche des tâches récurrentes** qui se remettent à zéro chaque jour, chaque semaine ou chaque mois.
 
 [![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-2D47C9)](https://semainier-cadgeff.pages.dev/#demo)
+[![CI](https://github.com/CadGeff/Planning/actions/workflows/ci.yml/badge.svg)](https://github.com/CadGeff/Planning/actions/workflows/ci.yml)
+![En-têtes de sécurité : A+](https://img.shields.io/badge/securityheaders.com-A%2B-23946A)
 ![JavaScript sans framework](https://img.shields.io/badge/JavaScript-sans%20framework-1B2140)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-23946A)
 ![PWA](https://img.shields.io/badge/PWA-installable-C98712)
@@ -41,29 +43,33 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 
 | Couche | Choix | Pourquoi |
 |---|---|---|
-| Interface | HTML, CSS et JavaScript natifs, sans framework ni build | Le projet tient en quelques fichiers lisibles, se déploie tel quel et n'a aucune dépendance à maintenir. |
+| Interface | HTML, CSS et JavaScript natifs (modules ES), sans framework ni build | Le code servi est le code écrit : lisible dans le navigateur, déployé tel quel, aucune dépendance d'exécution à maintenir. |
 | Données et authentification | [Supabase](https://supabase.com) : Postgres, Auth, API REST | Postgres standard et open source, sécurisé par Row Level Security, exportable avec `pg_dump`, auto-hébergeable. |
 | Hébergement | Cloudflare Pages | Site statique gratuit, déployé à chaque push, avec de vrais en-têtes HTTP de sécurité (`_headers`). |
 | Hors connexion | Service worker, stratégie « réseau d'abord » | Toujours la dernière version en ligne, et l'interface s'ouvre quand même sans réseau. |
 | Ressources | `supabase-js` et polices copiés dans le dépôt | Aucun CDN tiers : pas de fuite d'adresse IP vers Google Fonts, pas de dépendance à la disponibilité d'un CDN. |
+| Qualité | ESLint, Prettier, TypeScript (JSDoc), `node:test`, Playwright, GitHub Actions | Outils de développement uniquement : rien de tout cela n'est envoyé au navigateur. |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     subgraph Navigateur
-        UI["app.js<br/>interface"] --> REC["recurrence.js<br/>règles de récurrence"]
-        UI --> ST["store.js<br/>couche de stockage"]
+        UI["Interface<br/>board, form, menu, session…"] --> ST["state.js<br/>état + file d'écritures"]
+        UI --> REC["recurrence.js · layout.js · items.js<br/>fonctions pures"]
+        ST --> STO["store.js<br/>couche de stockage"]
         SW["sw.js<br/>cache hors connexion"]
     end
     CF["Cloudflare Pages<br/>fichiers statiques + en-têtes"] -->|HTTPS| SW
-    ST -->|"démo ou config vide"| LS[("localStorage")]
-    ST -->|"supabase-js<br/>jeton JWT"| AUTH["Supabase Auth"]
-    ST -->|REST| API["API PostgREST"]
+    STO -->|"démo ou config vide"| LS[("localStorage")]
+    STO -->|"supabase-js<br/>jeton JWT"| AUTH["Supabase Auth"]
+    STO -->|REST| API["API PostgREST"]
     API --> PG[("Postgres<br/>items, settings + RLS")]
 ```
 
 **Une règle, pas des occurrences.** La base stocke chaque élément une seule fois, avec sa règle de répétition. Les occurrences sont calculées à l'affichage par `recurrence.js`, un module de fonctions pures couvert par des tests. Deux tableaux JSON par élément gardent les exceptions : `done`, pour les jours cochés, et `skipped`, pour les jours retirés de la série.
+
+**Modules sans effet de bord.** Chaque module d'interface exporte une fonction `init…()` appelée par `app.js` : importer un module ne pose aucun écouteur et ne déclenche aucun rendu, ce qui rend l'ordre de démarrage explicite. La logique métier (récurrence, placement des créneaux, validation des imports, traduction des erreurs) vit dans des modules purs, testés sous Node sans navigateur.
 
 **Trois modes, une interface.** `store.js` expose la même interface (`list`, `save`, `remove`…) derrière trois implémentations : Supabase en production, `localStorage` pour la démo publique (`#demo`), et un mode local quand `config.js` est vide. L'interface ne sait pas où vont les données.
 
@@ -89,13 +95,14 @@ Le dépôt est public et la clé Supabase est visible dans le navigateur, comme 
 - **Row Level Security** sur les tables `items` et `settings` : chaque requête est filtrée par `auth.uid() = user_id`, en lecture comme en écriture. Un utilisateur authentifié ne peut ni lire, ni modifier, ni s'approprier la ligne d'un autre. Le rôle `anon` n'a aucun droit sur ces tables.
 - **Inscriptions désactivées** : le seul compte est créé à la main dans le tableau de bord Supabase.
 - **Seule la clé publishable est exposée.** L'application refuse de démarrer en mode Supabase si `config.js` contient une clé à privilèges (`sb_secret_…` ou `service_role`).
-- **Content Security Policy** stricte, envoyée en en-tête HTTP : scripts, feuilles de style et polices servis uniquement par le site, aucun bloc `<style>` ni script inline, requêtes réseau limitées **au seul projet Supabase** de l'application (un script injecté ne pourrait pas exfiltrer vers un autre projet), pas de `<base>`, de formulaire externe ni d'objet embarqué.
-- **En-têtes HTTP** (`_headers`) : HSTS, `frame-ancestors 'none'` et `X-Frame-Options` contre le clickjacking (doublés d'une vérification en JavaScript), `nosniff`, `Permissions-Policy` qui coupe caméra, micro, géolocalisation et paiement, isolation `Cross-Origin-Opener-Policy` / `Cross-Origin-Resource-Policy`.
+- **Content Security Policy** stricte, envoyée en en-tête HTTP, **sans aucune exception `unsafe-inline`** : scripts, styles et polices servis uniquement par le site, aucun script, bloc `<style>` ni attribut `style=""` en ligne (les positions de la grille passent par le CSSOM), requêtes réseau limitées **au seul projet Supabase** de l'application (un script injecté ne pourrait pas exfiltrer vers un autre projet), pas de `<base>`, de formulaire externe ni d'objet embarqué.
+- **En-têtes HTTP** (`_headers`) : HSTS, `frame-ancestors 'none'` et `X-Frame-Options` contre le clickjacking (doublés d'une vérification en JavaScript), `nosniff`, `Permissions-Policy` qui coupe caméra, micro, géolocalisation et paiement, isolation `Cross-Origin-Opener-Policy` / `Cross-Origin-Resource-Policy`. Les en-têtes ajoutés par défaut par Cloudflare (CORS ouvert, rapports d'erreurs réseau) sont retirés.
 - **Double authentification optionnelle, vérifiée côté serveur** : quand un facteur TOTP est actif, une politique RLS *restrictive* exige un jeton de niveau `aal2` sur `items` et `settings`. Un mot de passe volé donne une session `aal1`, qui ne lit ni n'écrit rien, même en appelant l'API directement. La fonction de contrôle vit dans un schéma `private` non exposé par l'API.
 - **Sessions** : changer de mot de passe ou activer la 2FA révoque les autres sessions ; « Se déconnecter » ferme la session sur tous les appareils.
 - **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, forme des objets JSON.
 - **Entrées non fiables** : les imports JSON sont revalidés champ par champ et tout le texte affiché est échappé.
 - **Pas de tiers** : ni CDN, ni polices distantes, ni outil d'analyse d'audience. En-tête `no-referrer`.
+- **Vérifié automatiquement** : les tests de bout en bout contrôlent à chaque push les en-têtes, l'absence de violation de CSP, le blocage d'un script ou d'un style injecté, le refus d'affichage dans un cadre, l'échappement des titres et le parcours 2FA.
 
 ### Modèle de menace
 
@@ -133,8 +140,7 @@ Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est un
 - **Jeton en `localStorage`** : un XSS réussi pourrait le lire. La CSP et l'échappement systématique rendent ce scénario très improbable, et le jeton expire au bout d'une heure.
 - **Données en clair côté serveur** : Supabase chiffre le disque, mais un administrateur du projet (ou de Supabase) peut lire les tables. Un chiffrement de bout en bout protégerait de ce cas, au prix de la recherche et de la synchro simple.
 - **Hébergeur** : Cloudflare voit passer les requêtes vers les fichiers du site (adresse IP, date), mais pas les données du planning, qui vont directement du navigateur à Supabase. Le site ne dépend d'aucune fonctionnalité propre à Cloudflare : il se redéploie ailleurs tel quel.
-- **Styles en attribut** : la grille positionne les créneaux avec des attributs `style`, d'où `style-src-attr 'unsafe-inline'`. Le risque est faible (pas de script possible par ce biais) ; les passer en CSSOM permettrait de retirer cette exception.
-- **Chaîne d'approvisionnement** : une compromission du compte GitHub ou Cloudflare permettrait de servir un code modifié. Parade : mots de passe uniques, 2FA sur GitHub, Cloudflare et Supabase, accès de Cloudflare limité à ce seul dépôt.
+- **Chaîne d'approvisionnement** : une compromission du compte GitHub ou Cloudflare permettrait de servir un code modifié. Parade : mots de passe uniques, 2FA sur GitHub, Cloudflare et Supabase, accès de Cloudflare limité à ce seul dépôt. Les dépendances npm ne servent qu'au développement et ne sont jamais déployées ; les actions GitHub sont épinglées par empreinte de commit et le workflow n'a que le droit de lecture.
 
 ## Installer sa propre instance
 
@@ -147,7 +153,7 @@ Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est un
 
 ### 2. Configuration
 
-Récupérer l'URL du projet et la clé **publishable** (bouton **Connect** du projet, ou **Project Settings → API Keys**), puis les renseigner dans `config.js` :
+Récupérer l'URL du projet et la clé **publishable** (bouton **Connect** du projet, ou **Project Settings → API Keys**), puis les renseigner dans `public/config.js` :
 
 ```js
 window.SEMAINIER_CONFIG = {
@@ -158,41 +164,83 @@ window.SEMAINIER_CONFIG = {
 
 ### 3. Déploiement
 
-Sur [Cloudflare](https://dash.cloudflare.com), **Workers & Pages → Create application → Pages → Connect to Git**, choisir le dépôt, puis laisser *Framework preset* sur **None** et *Build command* vide. Chaque push sur `main` redéploie le site, servi à `https://<projet>.pages.dev`. Le fichier `_headers` y est appliqué automatiquement.
+Sur [Cloudflare](https://dash.cloudflare.com), **Workers & Pages → Create application → Pages → Connect to Git**, choisir le dépôt, puis :
 
-Pour votre propre instance, remplacez l'adresse du projet Supabase dans la directive `connect-src` de la CSP, à deux endroits : `index.html` et `_headers`. Puis, dans Supabase, **Authentication → URL Configuration**, renseignez l'adresse du site.
+| Réglage | Valeur |
+|---|---|
+| Framework preset | None |
+| Build command | *(vide)* |
+| Build output directory | `public` |
+| Variable d'environnement | `SKIP_DEPENDENCY_INSTALL` = `1` (les dépendances npm ne servent qu'aux tests) |
 
-N'importe quel hébergeur de fichiers statiques convient (Netlify, nginx, GitHub Pages…). Sans prise en charge de `_headers`, la CSP de `index.html` et la protection anti-cadre en JavaScript restent actives, mais les autres en-têtes sont perdus.
+Chaque push sur `main` redéploie le site, servi à `https://<projet>.pages.dev`. Seul le dossier `public/` est publié ; `public/_headers` y est appliqué automatiquement.
+
+Pour votre propre instance, remplacez l'adresse du projet Supabase dans la directive `connect-src` de la CSP, à deux endroits : `public/index.html` et `public/_headers` (un test vérifie qu'ils restent identiques). Puis, dans Supabase, **Authentication → URL Configuration**, renseignez l'adresse du site.
+
+N'importe quel hébergeur de fichiers statiques convient (Netlify, nginx…) : il suffit de servir `public/`. Sans prise en charge de `_headers`, la CSP de `index.html` et la protection anti-cadre en JavaScript restent actives, mais les autres en-têtes sont perdus.
 
 ## Développement
 
-Aucune installation n'est nécessaire. Avec un `config.js` vide, l'application tourne en mode local :
+L'application elle-même n'a besoin d'aucune installation : les fichiers de `public/` sont servis tels quels. Avec un `config.js` vide, elle tourne en mode local. L'outillage demande Node 22 ou plus :
 
 ```
-python -m http.server 8000     # puis http://localhost:8000
-node --test                    # tests de recurrence.js (Node 18+)
+npm install                     # outils de développement (une fois)
+npm run serve                   # http://localhost:4173, avec les en-têtes de production
+npm run check                   # lint + format + types + tests unitaires
+npx playwright install chromium # navigateur de test (une fois)
+npm run test:e2e                # tests de bout en bout
 ```
 
-Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHELL` dans `sw.js` et incrémenter `CACHE`.
+Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHELL` dans `public/sw.js` et incrémenter `CACHE` (le test hors connexion échoue sinon).
+
+## Qualité et tests
+
+Chaque push déclenche la [CI GitHub Actions](.github/workflows/ci.yml) :
+
+| Étape | Outil | Ce qui est vérifié |
+|---|---|---|
+| Lint | ESLint | Erreurs courantes, variables inutilisées, `===` obligatoire, pas de `var` |
+| Format | Prettier | Mise en forme homogène de tout le code |
+| Types | TypeScript sur annotations JSDoc | Cohérence des types sans étape de compilation (`jsconfig.json`) |
+| Tests unitaires | `node:test` | Récurrence, placement des créneaux, validation des imports, traduction des erreurs |
+| Tests de bout en bout | Playwright (Chromium) | Démo, connexion, mot de passe, 2FA, sécurité, hors connexion |
+
+Les tests de bout en bout tournent sur le site servi avec ses en-têtes de production, et **simulent Supabase** ([`tests/e2e/fixtures.js`](tests/e2e/fixtures.js)) : aucun test ne touche la vraie base, et la simulation reproduit la politique RLS de la 2FA (aucune donnée sans session `aal2`). Dependabot propose chaque mois les mises à jour des outils et des actions, validées par la CI avant fusion.
 
 ## Structure
 
 ```
-index.html            page unique, CSP
-_headers              en-têtes HTTP de sécurité (Cloudflare Pages)
-styles.css            thème clair et sombre, mise en page
-app.js                interface : rendu, formulaires, raccourcis, synchronisation
-recurrence.js         dates et règles de récurrence (fonctions pures)
-theme.js              applique le thème choisi avant l'affichage
-store.js              stockage : Supabase, local ou démo
-config.js             URL et clé publishable Supabase
-sw.js                 service worker
-manifest.webmanifest  installation sur l'écran d'accueil
-supabase/schema.sql   tables, contraintes, RLS
-tests/                tests node:test
-vendor/               supabase-js 2.117.2 (MIT)
-fonts/                Bricolage Grotesque, Instrument Sans, IBM Plex Mono (SIL OFL)
-icons/, docs/         icônes et captures
+public/                   le site, publié tel quel
+  index.html              page unique, CSP
+  _headers                en-têtes HTTP de sécurité (Cloudflare Pages)
+  styles.css              thème clair et sombre, mise en page
+  theme.js                thème et anti-cadre, avant l'affichage
+  config.js               URL et clé publishable Supabase
+  sw.js                   service worker
+  manifest.webmanifest    installation sur l'écran d'accueil
+  js/
+    app.js                point d'entrée : branchement des modules, clavier
+    board.js              grille, légende, navigation
+    form.js, detail.js    création / modification, détail d'une occurrence
+    menu.js               menu, export / import, thème
+    categories.js         noms des catégories
+    account.js            mot de passe, double authentification
+    session.js            connexion, étape du code, chargement, démarrage
+    state.js              état et file d'écritures
+    store.js              stockage : Supabase, local ou démo
+    recurrence.js         dates et récurrence          ┐
+    layout.js             placement des créneaux       │ fonctions pures,
+    items.js              modèle, validation, exemple  │ testées sous Node
+    errors.js             traduction des erreurs       ┘
+    dom.js, ids.js        utilitaires
+  vendor/                 supabase-js 2.117.2 (MIT)
+  fonts/, icons/          polices (SIL OFL) et icônes
+supabase/schema.sql       tables, contraintes, RLS, 2FA
+tests/unit/               tests node:test
+tests/e2e/                tests Playwright et simulation de Supabase
+tests/server.js           serveur local avec les en-têtes de production
+.github/                  CI et Dependabot
+docs/                     captures du README
 ```
 
 ## Feuille de route
@@ -205,4 +253,4 @@ icons/, docs/         icônes et captures
 
 ## Licence
 
-Code sous licence [MIT](LICENSE). Polices sous licence SIL Open Font License, client `supabase-js` sous licence MIT (voir `fonts/` et `vendor/`).
+Code sous licence [MIT](LICENSE). Polices sous licence SIL Open Font License, client `supabase-js` sous licence MIT (voir `public/fonts/` et `public/vendor/`).

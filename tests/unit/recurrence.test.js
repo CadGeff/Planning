@@ -1,7 +1,7 @@
 // Tests des règles de récurrence — aucune dépendance : `node --test`
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const R = require("../recurrence.js");
+import test from "node:test";
+import assert from "node:assert/strict";
+import * as R from "../../public/js/recurrence.js";
 
 test("hebdo : uniquement les jours cochés, jamais avant la date de départ", () => {
   const it = { start: "2026-09-29", recur: "weekly", days: [1, 3] }; // mardi et jeudi
@@ -53,7 +53,10 @@ test("semaines ISO 8601", () => {
 });
 
 test("libellés de récurrence", () => {
-  assert.equal(R.recurText({ start: "2026-09-28", recur: "weekly", days: [4, 0, 1, 2, 3] }), "Chaque jour de semaine (lun → ven)");
+  assert.equal(
+    R.recurText({ start: "2026-09-28", recur: "weekly", days: [4, 0, 1, 2, 3] }),
+    "Chaque jour de semaine (lun → ven)",
+  );
   assert.equal(R.recurText({ start: "2026-09-28", recur: "weekly", days: [1, 3] }), "Chaque semaine : mardi, jeudi");
   assert.equal(R.recurText({ start: "2026-10-05", recur: "monthly" }), "Chaque mois, le 5");
 });

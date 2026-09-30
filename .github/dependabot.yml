@@ -1,0 +1,14 @@
+# Mises à jour automatiques proposées en pull request, testées par la CI avant fusion.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      outillage:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

@@ -1,0 +1,11 @@
+# Code tiers et fichiers générés
+public/vendor/
+package-lock.json
+playwright-report/
+test-results/
+# Fichier de configuration propre à chaque instance (non reformaté)
+public/config.js
+# Textes rédigés à la main
+*.md
+# SQL : pas de formateur Prettier
+supabase/

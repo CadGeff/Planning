@@ -1,0 +1,30 @@
+{
+  "name": "semainier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Planning perso en vue semaine : créneaux bloqués et tâches récurrentes.",
+  "license": "MIT",
+  "author": "Geoffrey Caduela",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "serve": "node tests/server.js",
+    "test": "node --test \"tests/unit/*.test.js\"",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p jsconfig.json",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.9",
+    "typescript": "7.0.2"
+  }
+}
