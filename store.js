@@ -6,6 +6,7 @@
  *   signIn(e, p)   (Supabase seulement)
  *   signOut()      (Supabase seulement)
  *   changePassword(p) (Supabase seulement)
+ *   mfaStatus() / mfaEnroll() / mfaVerify(id, code) / mfaDisable(id) (Supabase seulement)
  *   onSignedOut(fn)
  *   list()         -> tableau d'éléments, ou null si rien n'a jamais été enregistré (local)
  *   save(item)     crée ou remplace un élément
@@ -164,6 +165,44 @@
       },
       // Portée « global » : la déconnexion ferme la session sur tous les appareils.
       async signOut() { await client.auth.signOut({ scope: "global" }); },
+      // ---------- Double authentification (TOTP), optionnelle ----------
+      /** { needsCode, enabled, factorId } : needsCode = un code est exigé pour cette session. */
+      async mfaStatus() {
+        const { data: aal, error: e1 } = await client.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (e1) throw frenchError(e1);
+        // listFactors interroge le serveur : détecte aussi une 2FA activée depuis un autre appareil.
+        const { data: f, error: e2 } = await client.auth.mfa.listFactors();
+        if (e2) throw frenchError(e2);
+        const verified = (f && f.totp) || [];
+        const enabled = verified.length > 0;
+        return { enabled, factorId: enabled ? verified[0].id : null, needsCode: enabled && aal.currentLevel !== "aal2" };
+      },
+      async mfaEnroll() {
+        // Nettoie un enrôlement abandonné (facteur non vérifié), sinon Supabase refuse le nouveau.
+        const { data: f } = await client.auth.mfa.listFactors();
+        for (const x of (f && f.all) || []) {
+          if (x.factor_type === "totp" && x.status !== "verified") await client.auth.mfa.unenroll({ factorId: x.id });
+        }
+        const { data, error } = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: "Semainier", issuer: "Semainier" });
+        if (error) throw frenchError(error);
+        return { factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret };
+      },
+      async mfaVerify(factorId, code) {
+        const { error } = await client.auth.mfa.challengeAndVerify({ factorId, code });
+        if (!error) return;
+        const msg = `${error.code || ""} ${error.message || ""}`;
+        if (/invalid|mfa_verification_failed|expired/i.test(msg)) throw new Error("Code incorrect ou expiré. Attends le suivant dans ton application et réessaie.");
+        if (/too many|rate/i.test(msg)) throw new Error("Trop d'essais. Patiente une minute avant de réessayer.");
+        throw frenchError(error);
+      },
+      async mfaDisable(factorId) {
+        const { error } = await client.auth.mfa.unenroll({ factorId });
+        if (error) throw frenchError(error);
+        await client.auth.refreshSession().catch(() => {});
+      },
+      /** Après activation : les autres appareils doivent se reconnecter avec le code. */
+      async signOutOthers() { try { await client.auth.signOut({ scope: "others" }); } catch (e) { /* non bloquant */ } },
+
       async changePassword(password) {
         const { error } = await client.auth.updateUser({ password });
         if (!error) {

@@ -135,3 +135,51 @@ create policy "settings: suppression de sa ligne" on public.settings
 
 revoke all on public.settings from anon;
 grant select, insert, update, delete on public.settings to authenticated;
+
+-- ============================================ Double authentification
+-- 2FA optionnelle, imposée par la base : si l'utilisateur a activé un facteur TOTP vérifié,
+-- toute requête doit provenir d'une session qui a validé le code (claim JWT aal = 'aal2').
+-- Sans facteur actif, rien ne change. Politiques RESTRICTIVES : elles s'ajoutent (ET logique)
+-- aux politiques ci-dessus, qu'elles ne peuvent jamais élargir.
+
+-- Schéma non exposé par l'API REST de Supabase (seul « public » l'est).
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
+
+-- SECURITY DEFINER : lit auth.mfa_factors avec les droits du propriétaire, sans dépendre
+-- des droits accordés au rôle « authenticated » sur le schéma auth. search_path vide :
+-- aucune résolution de nom détournable.
+create or replace function private.mfa_satisfied()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when exists (
+      select 1 from auth.mfa_factors f
+      where f.user_id = (select auth.uid()) and f.status = 'verified'
+    )
+    then coalesce((select auth.jwt() ->> 'aal'), '') = 'aal2'
+    else true
+  end;
+$$;
+
+revoke all on function private.mfa_satisfied() from public, anon;
+grant execute on function private.mfa_satisfied() to authenticated;
+
+drop policy if exists "items: 2FA exigée si activée" on public.items;
+create policy "items: 2FA exigée si activée" on public.items
+  as restrictive
+  for all to authenticated
+  using ((select private.mfa_satisfied()))
+  with check ((select private.mfa_satisfied()));
+
+drop policy if exists "settings: 2FA exigée si activée" on public.settings;
+create policy "settings: 2FA exigée si activée" on public.settings
+  as restrictive
+  for all to authenticated
+  using ((select private.mfa_satisfied()))
+  with check ((select private.mfa_satisfied()));

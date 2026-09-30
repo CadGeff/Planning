@@ -30,6 +30,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
 - **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine, <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
 - **Export et import JSON** pour sauvegarder ou migrer ses données.
+- **Double authentification (TOTP) optionnelle**, activable depuis le menu : QR code à scanner avec une application comme Aegis, puis code à 6 chiffres à chaque nouvelle connexion. Elle est imposée par la base de données, pas seulement par l'interface.
 - **Application installable (PWA)** : icône sur l'écran d'accueil, ouverture hors connexion.
 
 | Mode sombre | Mobile |
@@ -90,10 +91,49 @@ Le dépôt est public et la clé Supabase est visible dans le navigateur, comme 
 - **Seule la clé publishable est exposée.** L'application refuse de démarrer en mode Supabase si `config.js` contient une clé à privilèges (`sb_secret_…` ou `service_role`).
 - **Content Security Policy** stricte : scripts, styles et polices servis uniquement par le site, requêtes réseau limitées **au seul projet Supabase** de l'application (un script injecté ne pourrait pas exfiltrer vers un autre projet), pas de `<base>`, de formulaire externe ni d'objet embarqué.
 - **Anti-clickjacking** : la page refuse de s'afficher dans un cadre (`iframe`) d'un autre site.
-- **Changement de mot de passe** : les autres sessions ouvertes sont révoquées aussitôt.
+- **Double authentification optionnelle, vérifiée côté serveur** : quand un facteur TOTP est actif, une politique RLS *restrictive* exige un jeton de niveau `aal2` sur `items` et `settings`. Un mot de passe volé donne une session `aal1`, qui ne lit ni n'écrit rien, même en appelant l'API directement. La fonction de contrôle vit dans un schéma `private` non exposé par l'API.
+- **Sessions** : changer de mot de passe ou activer la 2FA révoque les autres sessions ; « Se déconnecter » ferme la session sur tous les appareils.
 - **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, forme des objets JSON.
 - **Entrées non fiables** : les imports JSON sont revalidés champ par champ et tout le texte affiché est échappé.
 - **Pas de tiers** : ni CDN, ni polices distantes, ni outil d'analyse d'audience. En-tête `no-referrer`.
+
+### Modèle de menace
+
+Un planning semble anodin, mais il décrit **où l'on est et quand** : horaires de travail, séances de sport, rendez-vous, absences du domicile. C'est ce qui justifie le niveau de protection, et c'est aussi ce qui en fixe les limites : l'objectif est de rendre une attaque coûteuse, pas de résister à un attaquant étatique.
+
+**Ce qu'on protège**
+
+| Actif | Pourquoi |
+|---|---|
+| Les éléments du planning | Révèlent routines et absences : utiles pour un cambriolage ou une filature. |
+| Le compte Supabase de l'application | Y accéder, c'est lire et modifier tout le planning. |
+| Le compte GitHub et le tableau de bord Supabase | Permettraient de modifier le code servi ou les règles de la base. |
+
+**Menaces et parades**
+
+| Menace | Parade en place |
+|---|---|
+| Quelqu'un lit la clé dans le code source et interroge l'API | La clé publishable ne donne aucun droit : `anon` n'a rien sur les tables, RLS filtre chaque ligne par utilisateur. |
+| Création d'un compte pour « entrer » dans l'application | Inscriptions fermées côté serveur. |
+| Mot de passe deviné, réutilisé ou fuité | Mot de passe long et unique généré par un gestionnaire ; limitation des tentatives par Supabase ; 2FA optionnelle imposée par RLS. |
+| Session restée ouverte sur un appareil perdu | Déconnexion globale, révocation des autres sessions au changement de mot de passe et à l'activation de la 2FA. |
+| Injection de script (XSS) via un titre ou un import | Texte toujours échappé, imports revalidés, CSP sans script inline ni domaine tiers. |
+| Exfiltration par un script injecté malgré tout | `connect-src` limité au seul projet Supabase de l'application. |
+| Page affichée dans un cadre piégé (clickjacking) | Refus d'affichage dans une `iframe`. |
+| Bibliothèque compromise sur un CDN | Aucun CDN : `supabase-js` et les polices sont versionnés dans le dépôt. |
+| Clé secrète commitée par erreur | L'application refuse de démarrer avec une clé `service_role` / `sb_secret_`, et GitHub bloque le push des secrets connus. |
+
+**Pourquoi la 2FA est optionnelle**
+
+Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est une friction réelle. La session reste ouverte sur les appareils de confiance, donc le code n'est demandé qu'à une nouvelle connexion ; la 2FA protège surtout contre un mot de passe compromis. Elle reste désactivable, et le facteur peut être supprimé depuis le tableau de bord Supabase si l'application d'authentification est perdue.
+
+**Risques résiduels, assumés**
+
+- **Appareil déverrouillé** : quiconque tient un téléphone ou un PC ouvert voit le planning. Le verrouillage de l'appareil reste la première ligne de défense.
+- **Jeton en `localStorage`** : un XSS réussi pourrait le lire. La CSP et l'échappement systématique rendent ce scénario très improbable, et le jeton expire au bout d'une heure.
+- **Données en clair côté serveur** : Supabase chiffre le disque, mais un administrateur du projet (ou de Supabase) peut lire les tables. Un chiffrement de bout en bout protégerait de ce cas, au prix de la recherche et de la synchro simple.
+- **En-têtes HTTP** : GitHub Pages ne permet pas d'en définir. La CSP passe par une balise `<meta>`, qui ne couvre pas `frame-ancestors` (d'où la protection en JavaScript), et il n'y a pas de `Permissions-Policy`. Un hébergement comme Cloudflare Pages lève cette limite.
+- **Chaîne d'approvisionnement** : une compromission du compte GitHub permettrait de servir un code modifié. Parade : mot de passe unique, 2FA sur GitHub et Supabase, pas de jeton d'accès inutile.
 
 ## Installer sa propre instance
 

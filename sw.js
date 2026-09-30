@@ -4,7 +4,7 @@
  * (autre origine) ne passent jamais par ce cache.
  * Pense à incrémenter CACHE quand tu ajoutes ou renommes un fichier de SHELL.
  */
-const CACHE = "semainier-v5";
+const CACHE = "semainier-v6";
 const SHELL = [
   "./",
   "index.html",

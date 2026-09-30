@@ -356,6 +356,7 @@
     $("m-exit").hidden = !demo;
     $("m-logout").hidden = !supa;
     $("m-password").hidden = !supa;
+    $("m-mfa").hidden = !supa;
     $("m-who").textContent = demo ? "Démo : rien n'est envoyé à un serveur."
       : supa ? `Connecté : ${email || "compte Supabase"}`
       : "Mode local : données dans ce navigateur.";
@@ -619,6 +620,89 @@
     } finally { btn.disabled = false; btn.textContent = "Changer"; }
   });
 
+  // --------------------------------------- Double authentification
+  // Rendu construit avec des nœuds DOM (textContent) : aucune donnée n'est injectée en HTML.
+  const el = (tag, props = {}, kids = []) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) { if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n[k] = v; }
+    for (const c of [].concat(kids)) if (c) n.append(c);
+    return n;
+  };
+  const mfaErr = m => { const e = $("mfaErr"); e.textContent = m || ""; e.hidden = !m; };
+  function mfaRender(body, actions) {
+    $("mfaBody").replaceChildren(...body);
+    $("mfaActions").replaceChildren(...actions);
+  }
+  function mfaOff() {
+    mfaRender([
+      el("p", {}, [el("span", { class: "mfa-state", text: "Désactivée" })]),
+      el("p", { text: "Une fois activée, chaque nouvelle connexion demandera un code à 6 chiffres de ton application d'authentification, en plus du mot de passe. La base de données refusera toute requête sans ce code : un mot de passe volé ne suffira plus." })
+    ], [
+      el("button", { type: "button", class: "btn", text: "Fermer", onclick: closeMfa }),
+      el("button", { type: "button", class: "btn primary", text: "Activer", onclick: mfaStart })
+    ]);
+  }
+  function mfaOn(st) {
+    const off = el("button", { type: "button", class: "btn danger spacer", text: "Désactiver" });
+    off.onclick = async () => {
+      if (!off.dataset.armed) return arm(off, "Confirmer la désactivation");
+      off.disabled = true;
+      try { await Store.mfaDisable(st.factorId); setStatus("Double authentification désactivée."); mfaErr(""); mfaOff(); }
+      catch (ex) { mfaErr(ex.message); off.disabled = false; }
+    };
+    mfaRender([
+      el("p", {}, [el("span", { class: "mfa-state on", text: "Active" })]),
+      el("p", { text: "Chaque nouvelle connexion demande le code de ton application. Les données sont inaccessibles sans lui, y compris via l'API." }),
+      el("p", { text: "Si tu perds ton application et sa sauvegarde : supprime le facteur depuis le tableau de bord Supabase (Authentication → Users → ton compte), puis reconnecte-toi." })
+    ], [off, el("button", { type: "button", class: "btn primary", text: "Fermer", onclick: closeMfa })]);
+  }
+  async function mfaStart() {
+    mfaErr("");
+    let en;
+    try { en = await Store.mfaEnroll(); } catch (ex) { return mfaErr(ex.message); }
+    const qr = el("img", { class: "mfa-qr", alt: "QR code à scanner avec ton application d'authentification" });
+    qr.src = en.qr;
+    const code = el("input", { class: "inp code-inp", type: "text", id: "mfa-code", inputMode: "numeric", autocomplete: "one-time-code", maxLength: 7, spellcheck: false });
+    const ok = el("button", { type: "button", class: "btn primary", text: "Valider" });
+    const submit = async () => {
+      const c = code.value.replace(/\s/g, "");
+      if (!/^\d{6}$/.test(c)) return mfaErr("Entre les 6 chiffres affichés par ton application.");
+      ok.disabled = true;
+      try {
+        await Store.mfaVerify(en.factorId, c);
+        await Store.signOutOthers();
+        setStatus("Double authentification activée. Les autres appareils devront se reconnecter avec le code.");
+        mfaErr("");
+        mfaOn({ factorId: en.factorId });
+      } catch (ex) { mfaErr(ex.message); ok.disabled = false; code.select(); }
+    };
+    ok.onclick = submit;
+    code.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
+    mfaRender([
+      el("p", {}, [el("b", { text: "1. " }), document.createTextNode("Dans Aegis, appuie sur + puis « Scanner un code QR ».")]),
+      qr,
+      el("p", { text: "Pas de caméra ? Saisis cette clé à la main :" }),
+      el("div", { class: "mfa-secret", text: en.secret }),
+      el("p", {}, [el("b", { text: "2. " }), document.createTextNode("Entre le code à 6 chiffres affiché :")]),
+      code
+    ], [
+      el("button", { type: "button", class: "btn", text: "Annuler", onclick: closeMfa }),
+      ok
+    ]);
+    setTimeout(() => code.focus(), 30);
+  }
+  async function openMfa() {
+    closeMenu();
+    mfaErr("");
+    mfaRender([el("p", { text: "Chargement…" })], []);
+    $("mfaScrim").hidden = false;
+    try { const st = await Store.mfaStatus(); st.enabled ? mfaOn(st) : mfaOff(); }
+    catch (ex) { mfaErr(ex.message); mfaRender([], [el("button", { type: "button", class: "btn", text: "Fermer", onclick: closeMfa })]); }
+  }
+  function closeMfa() { $("mfaScrim").hidden = true; mfaRender([], []); }
+  $("m-mfa").onclick = openMfa;
+  $("mfaScrim").addEventListener("mousedown", e => { if (e.target === $("mfaScrim")) closeMfa(); });
+
   // ------------------------------------------------------------ Thème
   // Réglage propre à chaque appareil : Auto (suit le système), Clair ou Sombre.
   const THEME_KEY = "semainier.theme";
@@ -648,6 +732,7 @@
       else if (!$("detScrim").hidden) closeDetail();
       else if (!$("catScrim").hidden) closeCats();
       else if (!$("pwScrim").hidden) closePw();
+      else if (!$("mfaScrim").hidden) closeMfa();
       else closeMenu(true);
       return;
     }
@@ -663,9 +748,22 @@
   });
 
   // --------------------------------------------- Chargement / synchro
+  let mfaFactorId = null;
+  /** Mode Supabase : si la 2FA est active et que la session n'a pas encore validé le code,
+   *  on bascule sur l'étape code au lieu d'afficher un planning vide (la base refuserait tout). */
+  async function codeRequired() {
+    if (Store.mode !== "supabase") return false;
+    const st = await Store.mfaStatus();
+    if (!st.needsCode) return false;
+    mfaFactorId = st.factorId;
+    items = []; loaded = false;
+    showCodeStep();
+    return true;
+  }
   async function reload(silent) {
     if (pending) return;
     try {
+      if (await codeRequired()) return;
       const list = await Store.list();
       if (pending) return; // une écriture a démarré entre-temps : on garde l'état local
       if (list === null && Store.mode !== "supabase") {
@@ -690,15 +788,31 @@
   function showLogin(msg) {
     $("app").hidden = true;
     $("login").hidden = false;
+    $("loginForm").hidden = false;
+    $("codeForm").hidden = true;
     const e = $("loginErr");
     e.hidden = !msg; e.textContent = msg || "";
     setTimeout(() => $("l-email").focus(), 30);
+  }
+  function showCodeStep() {
+    $("app").hidden = true;
+    $("login").hidden = false;
+    $("loginForm").hidden = true;
+    $("codeForm").hidden = false;
+    $("l-code").value = "";
+    $("codeErr").hidden = true;
+    setTimeout(() => $("l-code").focus(), 30);
   }
   function showApp() {
     $("login").hidden = true;
     $("app").hidden = false;
     syncMenu();
     render();
+  }
+  async function enterApp() {
+    showApp();
+    await reload();
+    scrollToNow();
   }
   $("loginForm").addEventListener("submit", async e => {
     e.preventDefault();
@@ -710,13 +824,25 @@
       const r = await Store.signIn(em, pw);
       email = r.email || em;
       $("l-pass").value = "";
-      showApp();
-      await reload();
-      scrollToNow();
+      if (await codeRequired()) return;
+      await enterApp();
     } catch (ex) {
       err.textContent = ex.message; err.hidden = false;
     } finally { btn.disabled = false; btn.textContent = "Se connecter"; }
   });
+  $("codeForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const code = $("l-code").value.replace(/\s/g, ""), err = $("codeErr");
+    if (!/^\d{6}$/.test(code)) { err.textContent = "Entre les 6 chiffres affichés par ton application."; err.hidden = false; return; }
+    const btn = $("codeBtn"); btn.disabled = true; btn.textContent = "Vérification…";
+    try {
+      await Store.mfaVerify(mfaFactorId, code);
+      await enterApp();
+    } catch (ex) {
+      err.textContent = ex.message; err.hidden = false; $("l-code").select();
+    } finally { btn.disabled = false; btn.textContent = "Valider"; }
+  });
+  $("codeCancel").onclick = async () => { await Store.signOut(); showLogin(); };
   $("m-logout").onclick = async () => { closeMenu(); await Store.signOut(); };
   Store.onSignedOut(() => { items = []; loaded = false; email = null; showLogin(); });
 
@@ -726,9 +852,9 @@
     try { session = await Store.init(); } catch (e) { session = { signedIn: false }; }
     if (!session.signedIn) return showLogin();
     email = session.email || null;
-    showApp();
-    await reload();
-    scrollToNow();
+    try { if (await codeRequired()) return; }
+    catch (e) { /* hors ligne : on tente quand même d'afficher le cache */ }
+    await enterApp();
     if (window.StoreConfigError) setStatus(window.StoreConfigError, true);
   }
   boot();

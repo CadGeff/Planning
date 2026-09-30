@@ -250,6 +250,17 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--rule);border
 .login p.alt{margin:4px 0 0;font-size:13px;color:var(--ink-2)}
 .login p.alt a{color:var(--accent)}
 
+/* ---------- Double authentification ---------- */
+.mfa-body{display:flex;flex-direction:column;gap:12px;font-size:14px;color:var(--ink-2)}
+.mfa-body p{margin:0}
+.mfa-body b{color:var(--ink)}
+.mfa-qr{align-self:center;width:200px;height:200px;padding:10px;background:#fff;border-radius:10px;border:1px solid var(--rule)}
+.mfa-secret{font-family:var(--f-mono);font-size:12.5px;color:var(--ink);background:var(--paper);border:1px dashed var(--rule);border-radius:8px;padding:8px 10px;word-break:break-all;user-select:all}
+.mfa-state{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--ink)}
+.mfa-state::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--ink-3)}
+.mfa-state.on::before{background:var(--cat-vert)}
+.code-inp{font-family:var(--f-mono);font-size:20px;letter-spacing:.3em;text-align:center}
+
 /* ---------- Mobile ---------- */
 @media (max-width:760px){
   .app{padding-bottom:104px}

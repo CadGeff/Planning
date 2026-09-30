@@ -37,6 +37,17 @@
     <button type="submit" class="btn primary" id="loginBtn">Se connecter</button>
     <p class="alt">Simple visite ? <a href="#demo">Essayer la démo</a>, sans compte.</p>
   </form>
+  <form id="codeForm" novalidate hidden>
+    <h1>Semainier</h1>
+    <p class="sub">Double authentification : entre le code à 6 chiffres de ton application (Aegis…).</p>
+    <div class="field">
+      <label for="l-code">Code</label>
+      <input class="inp code-inp" type="text" id="l-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" spellcheck="false">
+    </div>
+    <p class="err" id="codeErr" hidden></p>
+    <button type="submit" class="btn primary" id="codeBtn">Valider</button>
+    <p class="alt"><button type="button" class="linkbtn" id="codeCancel">Se déconnecter</button></p>
+  </form>
 </main>
 
 <!-- Application -->
@@ -72,6 +83,7 @@
         <div class="who" id="m-who"></div>
         <button role="menuitem" id="m-exit" hidden>Quitter la démo</button>
         <button role="menuitem" id="m-password" hidden>Changer le mot de passe</button>
+        <button role="menuitem" id="m-mfa" hidden>Double authentification</button>
         <button role="menuitem" id="m-logout" class="danger-item" hidden>Se déconnecter (tous les appareils)</button>
       </div>
       <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -195,6 +207,16 @@
       <button type="submit" class="btn primary" id="pw-save">Changer</button>
     </div>
   </form>
+</div>
+
+<!-- Double authentification (mode Supabase) -->
+<div class="scrim" id="mfaScrim" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">
+    <h2 id="mfaTitle">Double authentification</h2>
+    <div id="mfaBody" class="mfa-body"></div>
+    <p class="err" id="mfaErr" hidden></p>
+    <div class="actions" id="mfaActions"></div>
+  </div>
 </div>
 
 <script src="vendor/supabase-2.117.2.js"></script>
