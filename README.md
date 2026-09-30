@@ -88,7 +88,9 @@ Le dépôt est public et la clé Supabase est visible dans le navigateur, comme 
 - **Row Level Security** sur les tables `items` et `settings` : chaque requête est filtrée par `auth.uid() = user_id`, en lecture comme en écriture. Un utilisateur authentifié ne peut ni lire, ni modifier, ni s'approprier la ligne d'un autre. Le rôle `anon` n'a aucun droit sur ces tables.
 - **Inscriptions désactivées** : le seul compte est créé à la main dans le tableau de bord Supabase.
 - **Seule la clé publishable est exposée.** L'application refuse de démarrer en mode Supabase si `config.js` contient une clé à privilèges (`sb_secret_…` ou `service_role`).
-- **Content Security Policy** stricte : scripts, styles et polices servis uniquement par le site, requêtes réseau limitées à `*.supabase.co`, pas de `<base>`, de formulaire externe ni d'objet embarqué.
+- **Content Security Policy** stricte : scripts, styles et polices servis uniquement par le site, requêtes réseau limitées **au seul projet Supabase** de l'application (un script injecté ne pourrait pas exfiltrer vers un autre projet), pas de `<base>`, de formulaire externe ni d'objet embarqué.
+- **Anti-clickjacking** : la page refuse de s'afficher dans un cadre (`iframe`) d'un autre site.
+- **Changement de mot de passe** : les autres sessions ouvertes sont révoquées aussitôt.
 - **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, forme des objets JSON.
 - **Entrées non fiables** : les imports JSON sont revalidés champ par champ et tout le texte affiché est échappé.
 - **Pas de tiers** : ni CDN, ni polices distantes, ni outil d'analyse d'audience. En-tête `no-referrer`.
@@ -117,7 +119,7 @@ window.SEMAINIER_CONFIG = {
 
 Pousser le dépôt sur GitHub, puis activer **Settings → Pages → Deploy from a branch → `main` / `(root)`**. L'application est servie à `https://<utilisateur>.github.io/<dépôt>/`.
 
-N'importe quel hébergeur de fichiers statiques convient (Netlify, Cloudflare Pages, un simple nginx). Si Supabase est auto-hébergé sur un autre domaine, il faut l'ajouter à `connect-src` dans la CSP de `index.html`.
+N'importe quel hébergeur de fichiers statiques convient (Netlify, Cloudflare Pages, un simple nginx). Pour votre propre instance, remplacez l'adresse du projet Supabase dans la directive `connect-src` de la CSP (`index.html`).
 
 ## Développement
 

@@ -5,6 +5,7 @@
  *   init()         -> { signedIn, email? }
  *   signIn(e, p)   (Supabase seulement)
  *   signOut()      (Supabase seulement)
+ *   changePassword(p) (Supabase seulement)
  *   onSignedOut(fn)
  *   list()         -> tableau d'éléments, ou null si rien n'a jamais été enregistré (local)
  *   save(item)     crée ou remplace un élément
@@ -161,7 +162,21 @@
         const { error } = await client.from("settings").upsert({ user_id: uid, cat_labels: s.catLabels || {} }, { onConflict: "user_id" });
         if (error) throw frenchError(error);
       },
-      async signOut() { await client.auth.signOut(); },
+      // Portée « global » : la déconnexion ferme la session sur tous les appareils.
+      async signOut() { await client.auth.signOut({ scope: "global" }); },
+      async changePassword(password) {
+        const { error } = await client.auth.updateUser({ password });
+        if (!error) {
+          // Révoque toutes les autres sessions : un appareil volé ou oublié perd l'accès.
+          try { await client.auth.signOut({ scope: "others" }); } catch (e) { /* non bloquant */ }
+          return;
+        }
+        const msg = `${error.code || ""} ${error.message || ""}`;
+        if (/same_password|should be different/i.test(msg)) throw new Error("Le nouveau mot de passe doit être différent de l'actuel.");
+        if (/weak_password|at least/i.test(msg)) throw new Error("Mot de passe refusé par Supabase : trop court ou trop simple.");
+        if (/reauthentication/i.test(msg)) throw new Error("Supabase exige une connexion récente : déconnecte-toi, reconnecte-toi, puis réessaie.");
+        throw frenchError(error);
+      },
       onSignedOut(fn) { signedOutHandlers.push(fn); },
       async list() {
         const { data, error } = await client.from("items").select(COLS).order("created_at", { ascending: true });

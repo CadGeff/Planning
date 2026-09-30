@@ -355,6 +355,7 @@
     $("m-reset").hidden = !demo;
     $("m-exit").hidden = !demo;
     $("m-logout").hidden = !supa;
+    $("m-password").hidden = !supa;
     $("m-who").textContent = demo ? "Démo : rien n'est envoyé à un serveur."
       : supa ? `Connecté : ${email || "compte Supabase"}`
       : "Mode local : données dans ce navigateur.";
@@ -589,6 +590,35 @@
     }
   }
 
+  // ------------------------------------------------- Mot de passe
+  function openPw() {
+    closeMenu();
+    $("pw-user").value = email || "";
+    $("pw-new").value = ""; $("pw-confirm").value = "";
+    $("pwErr").hidden = true;
+    $("pwScrim").hidden = false;
+    setTimeout(() => $("pw-new").focus(), 30);
+  }
+  function closePw() { $("pwScrim").hidden = true; $("pw-new").value = ""; $("pw-confirm").value = ""; }
+  $("m-password").onclick = openPw;
+  $("pw-cancel").onclick = closePw;
+  $("pwScrim").addEventListener("mousedown", e => { if (e.target === $("pwScrim")) closePw(); });
+  $("pwForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const p1 = $("pw-new").value, p2 = $("pw-confirm").value, err = $("pwErr");
+    const fail = m => { err.textContent = m; err.hidden = false; };
+    if (p1.length < 12) return fail("12 caractères minimum. Idéalement, génère-le avec ton gestionnaire.");
+    if (p1 !== p2) return fail("Les deux saisies ne sont pas identiques.");
+    const btn = $("pw-save"); btn.disabled = true; btn.textContent = "Changement…";
+    try {
+      await Store.changePassword(p1);
+      closePw();
+      setStatus("Mot de passe changé. Les autres appareils ont été déconnectés.");
+    } catch (ex) {
+      fail(ex.message || "Changement impossible.");
+    } finally { btn.disabled = false; btn.textContent = "Changer"; }
+  });
+
   // ------------------------------------------------------------ Thème
   // Réglage propre à chaque appareil : Auto (suit le système), Clair ou Sombre.
   const THEME_KEY = "semainier.theme";
@@ -617,6 +647,7 @@
       if (!$("formScrim").hidden) closeForm();
       else if (!$("detScrim").hidden) closeDetail();
       else if (!$("catScrim").hidden) closeCats();
+      else if (!$("pwScrim").hidden) closePw();
       else closeMenu(true);
       return;
     }
