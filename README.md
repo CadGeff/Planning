@@ -4,10 +4,10 @@ Planning personnel en vue semaine, pensé comme une page de cahier : on y **bloq
 
 [![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-2D47C9)](https://semainier-cadgeff.pages.dev/#demo)
 [![CI](https://github.com/CadGeff/semainier/actions/workflows/ci.yml/badge.svg)](https://github.com/CadGeff/semainier/actions/workflows/ci.yml)
-![En-têtes de sécurité : A+](https://img.shields.io/badge/securityheaders.com-A%2B-23946A)
-![JavaScript sans framework](https://img.shields.io/badge/JavaScript-sans%20framework-1B2140)
-![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-23946A)
-![PWA](https://img.shields.io/badge/PWA-installable-C98712)
+[![En-têtes de sécurité : A+](https://img.shields.io/badge/securityheaders.com-A%2B-23946A)](https://securityheaders.com/?q=semainier-cadgeff.pages.dev&followRedirects=on)
+[![JavaScript sans framework](https://img.shields.io/badge/JavaScript-sans%20framework-1B2140)](#stack-technique)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-23946A)](#sécurité)
+[![PWA](https://img.shields.io/badge/PWA-installable-C98712)](#fonctionnalités)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-737A94)](LICENSE)
 
 **[→ Essayer la démo](https://semainier-cadgeff.pages.dev/#demo)**, sans compte, avec des données d'exemple stockées dans votre navigateur.
