@@ -245,11 +245,11 @@ docs/                     captures du README
 
 ## Feuille de route
 
-- [ ] Report automatique des tâches non faites au lendemain
+- [ ] Report au lendemain des tâches ponctuelles non faites
 - [ ] Vue mois
-- [ ] Déplacer et redimensionner les créneaux à la souris
-- [ ] Synchronisation en temps réel entre appareils (Supabase Realtime)
-- [ ] Statistiques : temps bloqué par catégorie, régularité des tâches récurrentes
+- [ ] Glisser-déposer et redimensionner les créneaux à la souris
+- [ ] Synchronisation instantanée entre appareils (aujourd'hui : à chaque retour sur l'onglet)
+- [ ] Statistiques dans la durée : temps bloqué par catégorie au fil des semaines, taux de réalisation et séries des tâches récurrentes
 
 ## Licence
 
