@@ -3,7 +3,7 @@
 Planning personnel en vue semaine, pensé comme une page de cahier : on y **bloque des créneaux** et on y **coche des tâches récurrentes** qui se remettent à zéro chaque jour, chaque semaine ou chaque mois.
 
 [![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-2D47C9)](https://semainier-cadgeff.pages.dev/#demo)
-[![CI](https://github.com/CadGeff/Planning/actions/workflows/ci.yml/badge.svg)](https://github.com/CadGeff/Planning/actions/workflows/ci.yml)
+[![CI](https://github.com/CadGeff/semainier/actions/workflows/ci.yml/badge.svg)](https://github.com/CadGeff/semainier/actions/workflows/ci.yml)
 ![En-têtes de sécurité : A+](https://img.shields.io/badge/securityheaders.com-A%2B-23946A)
 ![JavaScript sans framework](https://img.shields.io/badge/JavaScript-sans%20framework-1B2140)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-23946A)
