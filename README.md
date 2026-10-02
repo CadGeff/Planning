@@ -255,10 +255,10 @@ docs/                     captures du README
 
 Le Semainier a été développé avec Claude (Anthropic), utilisé comme binôme de développement.
 
-- **Mon rôle** : définir le besoin et les fonctionnalités, fixer le niveau d'exigence (le projet est parti d'un simple planning personnel ; c'est moi qui ai demandé d'en faire une application sécurisée de bout en bout et un projet de portfolio), arbitrer les choix d'architecture et de sécurité (Supabase et RLS, 2FA imposée par la base, hébergement avec en-têtes HTTP, modèle de menace), relire et tester chaque livraison, déployer et administrer l'infrastructure (Supabase, Cloudflare, GitHub) et sécuriser les comptes associés.
-- **Le rôle de Claude** : écrire l'essentiel du code, des tests et de la documentation, proposer des options et en expliquer les compromis.
+- **Mon rôle** : définir le besoin et les fonctionnalités, fixer le niveau d'exigence (le projet est parti d'un simple planning personnel ; c'est moi qui ai demandé d'en faire une application sécurisée de bout en bout et un projet de portfolio), arbitrer les choix d'architecture et de sécurité (Supabase et RLS, 2FA imposée par la base, hébergement avec en-têtes HTTP, modèle de menace), tester chaque livraison en conditions réelles et en vérifier le résultat, vérifier les affirmations de l'IA sur l'infrastructure réelle et faire corriger ses erreurs, déployer et administrer l'infrastructure (Supabase, Cloudflare, GitHub) et sécuriser les comptes associés.
+- **Le rôle de Claude** : écrire le code, les tests et la documentation, proposer des options et en expliquer les compromis.
 
-Le code assisté par IA passe par les mêmes garde-fous que le reste : lint, typage, tests unitaires et de bout en bout à chaque push.
+Tout le code passe par les mêmes garde-fous : lint, typage, tests unitaires et de bout en bout à chaque push.
 
 ## Licence
 
