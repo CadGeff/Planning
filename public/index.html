@@ -90,9 +90,9 @@
             ⋯
           </button>
           <div class="menu" id="menu" role="menu" hidden>
-            <button role="menuitem" id="m-export" aria-describedby="m-backup">Exporter mon planning (JSON)</button>
+            <button role="menuitem" id="m-export" aria-describedby="m-backup">Exporter une sauvegarde</button>
             <div class="note" id="m-backup"></div>
-            <button role="menuitem" id="m-import">Importer un fichier JSON</button>
+            <button role="menuitem" id="m-import">Importer une sauvegarde</button>
             <button role="menuitem" id="m-cats">Renommer les catégories</button>
             <button role="menuitem" id="m-reset" hidden>Réinitialiser la démo</button>
             <div class="sep" role="separator"></div>
@@ -117,7 +117,7 @@
         </div>
       </header>
 
-      <div class="bar" id="bar" aria-live="polite"></div>
+      <div class="bar" id="bar"></div>
       <div class="legend" id="legend" role="group" aria-label="Catégories"></div>
       <div class="strip" id="strip" role="group" aria-label="Jour affiché"></div>
       <div class="board" id="board"></div>
@@ -261,6 +261,14 @@
         <div id="mfaBody" class="mfa-body"></div>
         <p class="err" id="mfaErr" hidden></p>
         <div class="actions" id="mfaActions"></div>
+      </div>
+    </div>
+
+    <!-- Notifications : la zone reste dans la page pour que les lecteurs d'écran annoncent chaque message. -->
+    <div class="toast-zone" role="status" aria-live="polite">
+      <div class="toast" id="toast" hidden>
+        <span id="toastMsg"></span>
+        <button class="btn" id="toastOk" type="button" hidden>OK</button>
       </div>
     </div>
 

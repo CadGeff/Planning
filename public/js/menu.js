@@ -1,4 +1,4 @@
-// Menu ⋯ : export / import JSON, démo, thème, compte.
+// Menu ⋯ : sauvegarde (export / import JSON), démo, thème, compte.
 
 import { ds } from "./recurrence.js";
 import { DEFAULT_LABELS, cleanLabels, sample } from "./items.js";
@@ -121,7 +121,7 @@ function exportJson() {
     }
     syncBackupNote();
   }
-  setStatus(`Export téléchargé (${plural(data.items.length, "élément")}).`);
+  setStatus(`Sauvegarde téléchargée (${plural(data.items.length, "élément")}).`);
 }
 
 /**
@@ -140,7 +140,9 @@ async function importJson(file) {
   const labels = await labelsToRestore(read.labels);
   if (!read.items.length && !labels) return setStatus("Aucun élément valide dans ce fichier.", true);
   const { fresh, duplicates } = withoutDuplicates(read.items, state.items);
-  if (!fresh.length && !labels) return setStatus("Rien à importer : tout le fichier est déjà dans ton planning.");
+  // Le résultat d'un import reste affiché jusqu'au clic sur « OK ».
+  if (!fresh.length && !labels)
+    return setStatus("Rien à importer : toute la sauvegarde est déjà dans ton planning.", false, true);
   await tracked(async () => {
     if (fresh.length) {
       await Store.saveMany(fresh.map(clone));
@@ -159,7 +161,7 @@ async function importJson(file) {
   if (read.invalid) parts.push(`${plural(read.invalid, "ignoré")} (invalides)`);
   if (labels) parts.push("noms des catégories restaurés");
   const msg = parts.join(", ");
-  setStatus(`${msg[0].toUpperCase()}${msg.slice(1)}.`);
+  setStatus(`${msg[0].toUpperCase()}${msg.slice(1)}.`, false, true);
 }
 
 // ------------------------------------------------------------------ Démo

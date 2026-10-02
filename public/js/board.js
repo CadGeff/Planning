@@ -44,7 +44,7 @@ const occsFor = (day) => state.items.filter((it) => occurs(it, day));
 const isRecurring = (it) => it.recur && it.recur !== "none";
 
 // ------------------------------------------------------------------ Rendu
-/** Barre d'état : avancement des tâches du jour, bandeau de démo, messages. */
+/** Barre d'état : avancement des tâches du jour, bandeau de démo. */
 export function renderStatus() {
   const today = ds(new Date());
   const tasks = occsFor(today).filter((it) => it.kind === "task");
@@ -57,7 +57,6 @@ export function renderStatus() {
   else h += `<span class="pill">Aucune tâche aujourd'hui</span>`;
   if (Store.mode === "demo")
     h += `<span class="demo"><span class="demo-tag">Démo</span> Données d'exemple, enregistrées dans ce navigateur uniquement. <button class="linkbtn" id="resetDemo">Réinitialiser</button></span>`;
-  if (state.status.msg) h += `<span class="status${state.status.warn ? " warn" : ""}">${esc(state.status.msg)}</span>`;
   const bar = $("bar");
   bar.innerHTML = h;
   applyGeometry(bar);

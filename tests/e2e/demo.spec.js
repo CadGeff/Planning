@@ -92,7 +92,7 @@ test("renommer une catégorie", async ({ page }) => {
 test("import : rejette un fichier invalide, filtre les éléments incorrects", async ({ page }) => {
   const input = page.locator("#importFile");
   await input.setInputFiles({ name: "x.json", mimeType: "application/json", buffer: Buffer.from("pas du json") });
-  await expect(page.locator("#bar")).toContainText("Ce fichier n'est pas un JSON valide.");
+  await expect(page.locator("#toast")).toContainText("Ce fichier n'est pas un JSON valide.");
 
   const data = {
     items: [
@@ -105,7 +105,7 @@ test("import : rejette un fichier invalide, filtre les éléments incorrects", a
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(data)),
   });
-  await expect(page.locator("#bar")).toContainText("1 élément importé, 1 ignoré (invalides).");
+  await expect(page.locator("#toast")).toContainText("1 élément importé, 1 ignoré (invalides).");
   await expect(page.locator(".todo.day.today")).toContainText("Importé");
 });
 
@@ -114,7 +114,7 @@ async function exportData(page) {
   await page.getByRole("button", { name: "Plus d'options" }).click();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("menuitem", { name: "Exporter mon planning (JSON)" }).click(),
+    page.getByRole("menuitem", { name: "Exporter une sauvegarde" }).click(),
   ]);
   const chunks = await (await download.createReadStream()).toArray();
   return { name: download.suggestedFilename(), data: JSON.parse(Buffer.concat(chunks).toString()) };
@@ -140,12 +140,14 @@ test("import : réimporter sa sauvegarde ne crée aucun doublon", async ({ page 
   const before = await page.locator(".ev").count();
   const input = page.locator("#importFile");
   await input.setInputFiles(asFile(data));
-  await expect(page.locator("#bar")).toContainText("Rien à importer : tout le fichier est déjà dans ton planning.");
+  await expect(page.locator("#toast")).toContainText(
+    "Rien à importer : toute la sauvegarde est déjà dans ton planning.",
+  );
   expect(await page.locator(".ev").count()).toBe(before);
 
   data.items.push({ title: "Seul manquant", kind: "task", start: TODAY, recur: "none", cat: "vert" });
   await input.setInputFiles(asFile(data));
-  await expect(page.locator("#bar")).toContainText("1 élément importé, 11 déjà présents.");
+  await expect(page.locator("#toast")).toContainText("1 élément importé, 11 déjà présents.");
   await expect(page.locator(".todo.day.today")).toContainText("Seul manquant");
   await page.reload();
   await expect(page.locator(".todo.day.today")).toContainText("Seul manquant");
@@ -155,13 +157,13 @@ test("import : restaure les noms des catégories, sans écraser des noms personn
   const input = page.locator("#importFile");
   const item = (title) => ({ title, kind: "task", start: TODAY, recur: "none", cat: "bleu" });
   await input.setInputFiles(asFile({ format: 2, labels: { bleu: "Boulot" }, items: [item("Un")] }));
-  await expect(page.locator("#bar")).toContainText("1 élément importé, noms des catégories restaurés.");
+  await expect(page.locator("#toast")).toContainText("1 élément importé, noms des catégories restaurés.");
   await expect(page.locator("#legend")).toContainText("Boulot");
   await page.reload();
   await expect(page.locator("#legend")).toContainText("Boulot");
 
   await input.setInputFiles(asFile({ format: 2, labels: { bleu: "Autre nom" }, items: [item("Deux")] }));
-  await expect(page.locator("#bar")).toContainText("1 élément importé.");
+  await expect(page.locator("#toast")).toContainText("1 élément importé.");
   await expect(page.locator("#legend")).toContainText("Boulot");
   await expect(page.locator("#legend")).not.toContainText("Autre nom");
 });
@@ -172,7 +174,7 @@ test("import : refuse un fichier de plus de 2 Mo", async ({ page }) => {
     mimeType: "application/json",
     buffer: Buffer.alloc(2 * 1024 * 1024 + 1, " "),
   });
-  await expect(page.locator("#bar")).toContainText("Fichier trop volumineux (2 Mo maximum).");
+  await expect(page.locator("#toast")).toContainText("Fichier trop volumineux (2 Mo maximum).");
 });
 
 test("thème sombre mémorisé sur l'appareil", async ({ page }) => {
@@ -191,5 +193,58 @@ test.describe("sur mobile", () => {
     await expect(page.locator("#strip button")).toHaveCount(7);
     await page.locator('#strip [data-go="2026-10-01"]').click();
     await expect(page.locator(".col.day")).toHaveAttribute("data-col", "2026-10-01");
+  });
+});
+
+test.describe("notifications", () => {
+  const file = (data) => ({ name: "s.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
+
+  test("une confirmation s'affiche en bas puis disparaît seule", async ({ page }) => {
+    await page.getByRole("button", { name: "Plus d'options" }).click();
+    await page.getByRole("menuitem", { name: "Renommer les catégories" }).click();
+    await page.getByRole("button", { name: "Enregistrer" }).click();
+    const toast = page.locator("#toast");
+    await expect(page.locator("#toastMsg")).toHaveText("Catégories enregistrées.");
+    await expect(page.locator("#toastOk")).toBeHidden();
+    // La barre du haut ne porte plus les messages.
+    await expect(page.locator("#bar")).not.toContainText("Catégories enregistrées.");
+    const box = await toast.boundingBox();
+    expect(box.y).toBeGreaterThan(page.viewportSize().height / 2);
+    await expect(toast).toBeHidden({ timeout: 7000 });
+  });
+
+  test("le résultat d'un import reste jusqu'au clic sur OK", async ({ page }) => {
+    await page
+      .locator("#importFile")
+      .setInputFiles(file({ items: [{ title: "Importé", kind: "task", start: TODAY, recur: "none", cat: "vert" }] }));
+    const toast = page.locator("#toast");
+    await expect(toast).toContainText("1 élément importé.");
+    await page.waitForTimeout(5600);
+    await expect(toast).toBeVisible();
+    await page.getByRole("button", { name: "OK" }).click();
+    await expect(toast).toBeHidden();
+  });
+
+  test("une erreur reste affichée, Échap la ferme", async ({ page }) => {
+    await page
+      .locator("#importFile")
+      .setInputFiles({ name: "x.json", mimeType: "application/json", buffer: Buffer.from("{") });
+    const toast = page.locator("#toast");
+    await expect(toast).toHaveClass(/warn/);
+    await expect(page.locator("#toastOk")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(toast).toBeHidden();
+  });
+
+  test("sur mobile, la notification ne recouvre pas le bouton Ajouter", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page
+      .locator("#importFile")
+      .setInputFiles({ name: "x.json", mimeType: "application/json", buffer: Buffer.from("{") });
+    const toast = await page.locator("#toast").boundingBox();
+    const add = await page.locator("#add").boundingBox();
+    expect(toast.y + toast.height).toBeLessThanOrEqual(add.y);
+    expect(toast.x).toBeGreaterThanOrEqual(0);
+    expect(toast.x + toast.width).toBeLessThanOrEqual(390);
   });
 });

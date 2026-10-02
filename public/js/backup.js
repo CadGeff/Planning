@@ -44,7 +44,7 @@ export function readExport(text) {
     return { ok: false, error: "Ce fichier n'est pas un JSON valide." };
   }
   const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : null;
-  if (!list) return { ok: false, error: "Fichier non reconnu : il faut un export du Semainier." };
+  if (!list) return { ok: false, error: "Fichier non reconnu : il faut une sauvegarde du Semainier." };
   const items = list.map(sanitize).filter(Boolean);
   const rawLabels = Array.isArray(parsed) ? null : parsed.labels;
   const labels =

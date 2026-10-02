@@ -33,7 +33,9 @@ export async function mockSupabase(page, init = {}) {
     log: [],
     samePasswordOnce: false,
     // Nombre de requêtes à faire échouer (panne passagère) : { itemsGet, itemsPost }.
+    // supabase-js retente seul une lecture en échec : une seule panne en lecture reste invisible.
     fail: {},
+    slowItemsGet: 0,
     key: "sb_publishable_test",
     ...init,
   };
@@ -142,7 +144,11 @@ export async function mockSupabase(page, init = {}) {
         state.fail[outage]--;
         return json(route, 503, { message: "Service Unavailable" });
       }
-      if (m === "GET") return json(route, 200, state.items);
+      if (m === "GET") {
+        // Réseau lent : la réponse attend `slowItemsGet` millisecondes.
+        if (state.slowItemsGet) await new Promise((done) => setTimeout(done, state.slowItemsGet));
+        return json(route, 200, state.items);
+      }
       if (m === "POST") {
         for (const row of [].concat(body)) {
           const i = state.items.findIndex((r) => r.id === row.id);

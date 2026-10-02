@@ -30,6 +30,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps bloqué par catégorie sur la semaine, et un clic sur une catégorie efface les autres. Les noms sont modifiables et synchronisés entre appareils.
 - **Repères visuels** : jours passés atténués, colonne du jour, ligne de l'heure actuelle, compteur des tâches du jour.
 - **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
+- **Notifications** en bas de l'écran : une confirmation disparaît seule, une erreur ou le résultat d'un import reste jusqu'au clic sur « OK ».
 - **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine, <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
 - **Sauvegarde et restauration** : l'export JSON contient le planning et les noms des catégories ; l'import n'ajoute que ce qui manque, sans doublon. Le menu rappelle quand la dernière sauvegarde date de plus de 30 jours.
 - **Double authentification (TOTP) optionnelle**, activable depuis le menu : QR code à scanner avec une application comme Aegis, puis code à 6 chiffres à chaque nouvelle connexion. Elle est imposée par la base de données, pas seulement par l'interface.
@@ -229,6 +230,7 @@ public/                   le site, publié tel quel
     session.js            connexion, étape du code, chargement, démarrage
     state.js              état et file d'écritures
     store.js              stockage : Supabase, local ou démo
+    toast.js              notifications en bas de l'écran
     recurrence.js         dates et récurrence          ┐
     layout.js             placement des créneaux       │ fonctions pures,
     items.js              modèle, validation, exemple  │ testées sous Node

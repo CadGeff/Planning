@@ -26,7 +26,8 @@ export const state = {
   labels: { ...DEFAULT_LABELS },
   /** @type {string|null} catégorie mise en avant via la légende */
   focusCat: null,
-  status: { msg: "", warn: false },
+  /** Notification affichée. `sticky` : elle reste jusqu'au clic sur « OK ». */
+  status: { msg: "", warn: false, sticky: false },
   /** Écritures en cours : un rechargement ne doit pas écraser l'affichage pendant ce temps. */
   pending: 0,
 };
@@ -38,18 +39,23 @@ export const clone = (o) => JSON.parse(JSON.stringify(o));
 
 // ------------------------------------------------------------ Rafraîchissement
 let renderFn = () => {};
-let statusFn = () => {};
+let toastFn = () => {};
 /** Branche les fonctions d'affichage (appelé une fois au démarrage). */
-export function connectView({ render, renderStatus }) {
+export function connectView({ render, renderToast }) {
   renderFn = render;
-  statusFn = renderStatus;
+  toastFn = renderToast;
 }
 export const render = () => renderFn();
 
-/** Message affiché dans la barre d'état. @param {string} msg @param {boolean} [warn] */
-export function setStatus(msg, warn = false) {
-  state.status = { msg, warn };
-  statusFn();
+/**
+ * Affiche une notification ; un message vide ferme celle en cours.
+ * @param {string} msg
+ * @param {boolean} [warn]    erreur
+ * @param {boolean} [sticky]  reste jusqu'au clic sur « OK » (par défaut : les erreurs)
+ */
+export function setStatus(msg, warn = false, sticky = warn) {
+  state.status = { msg, warn, sticky };
+  toastFn();
 }
 
 // ------------------------------------------------------------ Écritures en file

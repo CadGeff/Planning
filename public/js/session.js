@@ -29,6 +29,9 @@ async function codeRequired() {
   return true;
 }
 
+/** Dernier message d'erreur de chargement affiché, tant qu'aucun chargement n'a réussi depuis. */
+let loadError = "";
+
 /**
  * Recharge les éléments et les réglages depuis le stockage.
  * @param {{ silent?: boolean, mfaChecked?: boolean }} [opts]
@@ -47,12 +50,16 @@ export async function reload({ silent = false, mfaChecked = false } = {}) {
     } else state.items = list || [];
     state.loaded = true;
     state.hasData = true;
-    if (!silent || state.status.warn) setStatus("");
+    // Un rechargement discret n'efface que l'erreur de chargement qu'il vient de corriger,
+    // jamais une autre notification en attente (résultat d'un import, par exemple).
+    if (!silent || (loadError && state.status.msg === loadError)) setStatus("");
+    loadError = "";
     await loadSettings();
     render();
   } catch (err) {
     state.loaded = true;
-    setStatus(err.message || "Chargement impossible.", true);
+    loadError = err.message || "Chargement impossible.";
+    setStatus(loadError, true);
     render();
   }
 }
@@ -159,6 +166,7 @@ export function initSession() {
     state.hasData = false;
     state.email = null;
     state.labels = cleanLabels(null);
+    setStatus("");
     showLogin();
   });
   // Retour sur l'onglet ou retour du réseau : on recharge (synchro entre appareils).

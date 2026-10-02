@@ -65,7 +65,7 @@ test("changement de mot de passe : validations, refus serveur, puis succès", as
 
   await save.click();
   await expect(page.locator("#pwScrim")).toBeHidden();
-  await expect(page.locator("#bar")).toContainText("Mot de passe changé");
+  await expect(page.locator("#toast")).toContainText("Mot de passe changé");
   expect(s.log.some((r) => r.path === "/auth/v1/logout" && r.search === "?scope=others")).toBe(true);
 });
 
@@ -150,7 +150,7 @@ test("session conservée au rechargement", async ({ page }) => {
 test("refuse de démarrer avec une clé secrète dans config.js", async ({ page }) => {
   const s = await mockSupabase(page, { key: "sb_secret_ne_jamais_publier" });
   await page.goto("/");
-  await expect(page.locator("#bar")).toContainText("clé secrète");
+  await expect(page.locator("#toast")).toContainText("clé secrète");
   expect(s.log).toEqual([]);
 });
 
@@ -163,7 +163,7 @@ test("sauvegarde : le menu rappelle la dernière, l'export la met à jour", asyn
   await expect(page.locator("#menuBtn")).not.toHaveClass(/has-note/);
   await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("menuitem", { name: "Exporter mon planning (JSON)" }).click(),
+    page.getByRole("menuitem", { name: "Exporter une sauvegarde" }).click(),
   ]);
   await openMenu(page);
   await expect(page.locator("#m-backup")).toHaveText("Dernière sauvegarde : aujourd'hui.");
@@ -186,7 +186,7 @@ test("sauvegarde de plus de 30 jours : pastille sur le menu, levée par un expor
   await expect(page.locator("#m-backup")).toHaveClass(/late/);
   await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("menuitem", { name: "Exporter mon planning (JSON)" }).click(),
+    page.getByRole("menuitem", { name: "Exporter une sauvegarde" }).click(),
   ]);
   await expect(btn).not.toHaveClass(/has-note/);
   await expect(btn).toHaveAttribute("aria-label", "Plus d'options");
@@ -210,7 +210,7 @@ test("restauration sur un compte vide : éléments et noms des catégories renvo
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(backup)),
   });
-  await expect(page.locator("#bar")).toContainText("2 éléments importés, noms des catégories restaurés.");
+  await expect(page.locator("#toast")).toContainText("2 éléments importés, noms des catégories restaurés.");
   await expect(page.locator("#legend")).toContainText("Boulot");
   expect(s.items.map((r) => r.title)).toEqual(["Restauré", "<img src=x onerror=alert(1)>"]);
   expect(s.items[0].id).not.toBe("ancien");
@@ -226,22 +226,26 @@ const backupFile = (data) => ({
 });
 const oneTask = { title: "En base", kind: "task", start: "2026-09-30", recur: "daily", cat: "vert" };
 
-test("planning non chargé : ni export ni import, pour ne pas sauvegarder du vide ni créer de doublons", async ({
+test("pendant le chargement : ni export ni import, pour ne pas sauvegarder du vide ni créer de doublons", async ({
   page,
 }) => {
   const s = await mockSupabase(page, {
-    fail: { itemsGet: 1 },
+    slowItemsGet: 2500,
     items: [{ id: "a1", ...oneTask, start_date: oneTask.start }],
   });
   await login(page);
-  await expect(page.locator("#app")).toBeVisible();
-  await expect(page.locator("#bar .status")).not.toHaveText("");
+  await expect(page.locator("#bar")).toContainText("Chargement du planning…");
   await page.locator("#importFile").setInputFiles(backupFile({ items: [oneTask] }));
-  await expect(page.locator("#bar")).toContainText("Le planning n'est pas chargé");
+  await expect(page.locator("#toast")).toContainText("Le planning n'est pas chargé");
+  await page.getByRole("button", { name: "OK" }).click();
   await openMenu(page);
-  await page.getByRole("menuitem", { name: "Exporter mon planning (JSON)" }).click();
-  await expect(page.locator("#bar")).toContainText("Le planning n'est pas chargé");
+  await page.getByRole("menuitem", { name: "Exporter une sauvegarde" }).click();
+  await expect(page.locator("#toast")).toContainText("Le planning n'est pas chargé");
   expect(await page.evaluate(() => localStorage.getItem("semainier.lastExport"))).toBeNull();
+  // Une fois le planning chargé, le même fichier est reconnu comme déjà présent.
+  await expect(page.locator("#board")).toContainText("En base");
+  await page.locator("#importFile").setInputFiles(backupFile({ items: [oneTask] }));
+  await expect(page.locator("#toast")).toContainText("Rien à importer");
   expect(s.log.some((r) => r.method === "POST" && r.path === "/rest/v1/items")).toBe(false);
   expect(s.items).toHaveLength(1);
 });
@@ -252,13 +256,13 @@ test("import interrompu par une panne : rien d'affiché à tort, le second essai
   await expect(page.locator("#app")).toBeVisible();
   const input = page.locator("#importFile");
   await input.setInputFiles(backupFile({ items: [oneTask], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#bar .status")).toHaveClass(/warn/);
+  await expect(page.locator("#toast")).toHaveClass(/warn/);
   await expect(page.locator("#board")).not.toContainText("En base");
   await expect(page.locator("#legend")).not.toContainText("Boulot");
   expect(s.items).toHaveLength(0);
 
   await input.setInputFiles(backupFile({ items: [oneTask], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#bar")).toContainText("1 élément importé, noms des catégories restaurés.");
+  await expect(page.locator("#toast")).toContainText("1 élément importé, noms des catégories restaurés.");
   await expect(page.locator("#board")).toContainText("En base");
   expect(s.items).toHaveLength(1);
   expect(s.settings.cat_labels.bleu).toBe("Boulot");
@@ -269,7 +273,7 @@ test("sauvegarde sans élément : les noms des catégories sont quand même rest
   await login(page);
   await expect(page.locator("#app")).toBeVisible();
   await page.locator("#importFile").setInputFiles(backupFile({ format: 2, items: [], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#bar")).toContainText("Noms des catégories restaurés.");
+  await expect(page.locator("#toast")).toContainText("Noms des catégories restaurés.");
   expect(s.settings.cat_labels.bleu).toBe("Boulot");
 });
 
@@ -278,7 +282,7 @@ test("noms personnalisés en base : une sauvegarde ne les remplace pas", async (
   await login(page);
   await expect(page.locator("#legend")).toContainText("Mon nom");
   await page.locator("#importFile").setInputFiles(backupFile({ items: [oneTask], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#bar")).toContainText("1 élément importé.");
+  await expect(page.locator("#toast")).toContainText("1 élément importé.");
   await expect(page.locator("#legend")).toContainText("Mon nom");
   expect(s.settings.cat_labels.bleu).toBe("Mon nom");
 });
