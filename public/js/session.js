@@ -2,7 +2,7 @@
 
 import { sample, cleanLabels } from "./items.js";
 import { Store, configError } from "./store.js";
-import { state, clone, render, setStatus } from "./state.js";
+import { state, clone, render, setStatus, dropStatus } from "./state.js";
 import { $, field, button, focusSoon } from "./dom.js";
 import { syncMenu } from "./menu.js";
 import { scrollToNow } from "./board.js";
@@ -52,12 +52,15 @@ export async function reload({ silent = false, mfaChecked = false } = {}) {
     state.hasData = true;
     // Un rechargement discret n'efface que l'erreur de chargement qu'il vient de corriger,
     // jamais une autre notification en attente (résultat d'un import, par exemple).
-    if (!silent || (loadError && state.status.msg === loadError)) setStatus("");
+    if (!silent) setStatus("");
+    else if (loadError) dropStatus(loadError);
     loadError = "";
     await loadSettings();
     render();
   } catch (err) {
     state.loaded = true;
+    // Une seule erreur de chargement à l'écran, même si plusieurs rechargements échouent.
+    if (loadError) dropStatus(loadError);
     loadError = err.message || "Chargement impossible.";
     setStatus(loadError, true);
     render();

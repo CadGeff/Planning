@@ -65,7 +65,7 @@ test("changement de mot de passe : validations, refus serveur, puis succès", as
 
   await save.click();
   await expect(page.locator("#pwScrim")).toBeHidden();
-  await expect(page.locator("#toast")).toContainText("Mot de passe changé");
+  await expect(page.locator(".toast").last()).toContainText("Mot de passe changé");
   expect(s.log.some((r) => r.path === "/auth/v1/logout" && r.search === "?scope=others")).toBe(true);
 });
 
@@ -150,7 +150,7 @@ test("session conservée au rechargement", async ({ page }) => {
 test("refuse de démarrer avec une clé secrète dans config.js", async ({ page }) => {
   const s = await mockSupabase(page, { key: "sb_secret_ne_jamais_publier" });
   await page.goto("/");
-  await expect(page.locator("#toast")).toContainText("clé secrète");
+  await expect(page.locator(".toast").last()).toContainText("clé secrète");
   expect(s.log).toEqual([]);
 });
 
@@ -210,7 +210,7 @@ test("restauration sur un compte vide : éléments et noms des catégories renvo
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(backup)),
   });
-  await expect(page.locator("#toast")).toContainText("2 éléments importés, noms des catégories restaurés.");
+  await expect(page.locator(".toast").last()).toContainText("2 éléments importés, noms des catégories restaurés.");
   await expect(page.locator("#legend")).toContainText("Boulot");
   expect(s.items.map((r) => r.title)).toEqual(["Restauré", "<img src=x onerror=alert(1)>"]);
   expect(s.items[0].id).not.toBe("ancien");
@@ -236,16 +236,16 @@ test("pendant le chargement : ni export ni import, pour ne pas sauvegarder du vi
   await login(page);
   await expect(page.locator("#bar")).toContainText("Chargement du planning…");
   await page.locator("#importFile").setInputFiles(backupFile({ items: [oneTask] }));
-  await expect(page.locator("#toast")).toContainText("Le planning n'est pas chargé");
-  await page.getByRole("button", { name: "OK" }).click();
+  await expect(page.locator(".toast").last()).toContainText("Le planning n'est pas chargé");
+  await page.getByRole("button", { name: "OK" }).last().click();
   await openMenu(page);
   await page.getByRole("menuitem", { name: "Exporter une sauvegarde" }).click();
-  await expect(page.locator("#toast")).toContainText("Le planning n'est pas chargé");
+  await expect(page.locator(".toast").last()).toContainText("Le planning n'est pas chargé");
   expect(await page.evaluate(() => localStorage.getItem("semainier.lastExport"))).toBeNull();
   // Une fois le planning chargé, le même fichier est reconnu comme déjà présent.
   await expect(page.locator("#board")).toContainText("En base");
   await page.locator("#importFile").setInputFiles(backupFile({ items: [oneTask] }));
-  await expect(page.locator("#toast")).toContainText("Rien à importer");
+  await expect(page.locator(".toast").last()).toContainText("Rien à importer");
   expect(s.log.some((r) => r.method === "POST" && r.path === "/rest/v1/items")).toBe(false);
   expect(s.items).toHaveLength(1);
 });
@@ -256,13 +256,13 @@ test("import interrompu par une panne : rien d'affiché à tort, le second essai
   await expect(page.locator("#app")).toBeVisible();
   const input = page.locator("#importFile");
   await input.setInputFiles(backupFile({ items: [oneTask], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#toast")).toHaveClass(/warn/);
+  await expect(page.locator(".toast").last()).toHaveClass(/warn/);
   await expect(page.locator("#board")).not.toContainText("En base");
   await expect(page.locator("#legend")).not.toContainText("Boulot");
   expect(s.items).toHaveLength(0);
 
   await input.setInputFiles(backupFile({ items: [oneTask], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#toast")).toContainText("1 élément importé, noms des catégories restaurés.");
+  await expect(page.locator(".toast").last()).toContainText("1 élément importé, noms des catégories restaurés.");
   await expect(page.locator("#board")).toContainText("En base");
   expect(s.items).toHaveLength(1);
   expect(s.settings.cat_labels.bleu).toBe("Boulot");
@@ -273,7 +273,7 @@ test("sauvegarde sans élément : les noms des catégories sont quand même rest
   await login(page);
   await expect(page.locator("#app")).toBeVisible();
   await page.locator("#importFile").setInputFiles(backupFile({ format: 2, items: [], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#toast")).toContainText("Noms des catégories restaurés.");
+  await expect(page.locator(".toast").last()).toContainText("Noms des catégories restaurés.");
   expect(s.settings.cat_labels.bleu).toBe("Boulot");
 });
 
@@ -282,7 +282,7 @@ test("noms personnalisés en base : une sauvegarde ne les remplace pas", async (
   await login(page);
   await expect(page.locator("#legend")).toContainText("Mon nom");
   await page.locator("#importFile").setInputFiles(backupFile({ items: [oneTask], labels: { bleu: "Boulot" } }));
-  await expect(page.locator("#toast")).toContainText("1 élément importé.");
+  await expect(page.locator(".toast").last()).toContainText("1 élément importé.");
   await expect(page.locator("#legend")).toContainText("Mon nom");
   expect(s.settings.cat_labels.bleu).toBe("Mon nom");
 });

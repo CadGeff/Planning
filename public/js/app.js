@@ -5,7 +5,7 @@ import { connectView } from "./state.js";
 import { closeOpenDialog, anyDialogOpen, $ } from "./dom.js";
 import { initBoard, render, goPrev, goNext, goToday, newItem } from "./board.js";
 import { initMenu, closeMenu, isMenuOpen } from "./menu.js";
-import { initToast, renderToast, dismissToast } from "./toast.js";
+import { renderToast, dismissToast } from "./toast.js";
 import { initForm } from "./form.js";
 import { initDetail } from "./detail.js";
 import { initCategories } from "./categories.js";
@@ -13,7 +13,6 @@ import { initAccount } from "./account.js";
 import { initSession, boot } from "./session.js";
 
 connectView({ render, renderToast });
-initToast();
 initBoard();
 initMenu();
 initForm();

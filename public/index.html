@@ -265,12 +265,7 @@
     </div>
 
     <!-- Notifications : la zone reste dans la page pour que les lecteurs d'écran annoncent chaque message. -->
-    <div class="toast-zone" role="status" aria-live="polite">
-      <div class="toast" id="toast" hidden>
-        <span id="toastMsg"></span>
-        <button class="btn" id="toastOk" type="button" hidden>OK</button>
-      </div>
-    </div>
+    <div class="toast-zone" id="toasts" role="status" aria-live="polite"></div>
 
     <script src="vendor/supabase-2.117.2.js"></script>
     <script src="config.js"></script>

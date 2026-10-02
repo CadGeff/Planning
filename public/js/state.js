@@ -26,8 +26,8 @@ export const state = {
   labels: { ...DEFAULT_LABELS },
   /** @type {string|null} catégorie mise en avant via la légende */
   focusCat: null,
-  /** Notification affichée. `sticky` : elle reste jusqu'au clic sur « OK ». */
-  status: { msg: "", warn: false, sticky: false },
+  /** @type {Toast[]} notifications affichées, de la plus ancienne à la plus récente */
+  toasts: [],
   /** Écritures en cours : un rechargement ne doit pas écraser l'affichage pendant ce temps. */
   pending: 0,
 };
@@ -48,14 +48,38 @@ export function connectView({ render, renderToast }) {
 export const render = () => renderFn();
 
 /**
- * Affiche une notification ; un message vide ferme celle en cours.
+ * Une notification.
+ * @typedef {object} Toast
+ * @property {number} id
+ * @property {string} msg
+ * @property {boolean} warn    erreur
+ * @property {boolean} sticky  reste jusqu'au clic sur « OK »
+ */
+
+/** Nombre maximal de notifications à l'écran : au-delà, la plus ancienne laisse sa place. */
+export const MAX_TOASTS = 3;
+let toastId = 0;
+
+/**
+ * Ajoute une notification à la pile ; un message vide les ferme toutes.
  * @param {string} msg
  * @param {boolean} [warn]    erreur
  * @param {boolean} [sticky]  reste jusqu'au clic sur « OK » (par défaut : les erreurs)
  */
 export function setStatus(msg, warn = false, sticky = warn) {
-  state.status = { msg, warn, sticky };
+  if (!msg) state.toasts = [];
+  else state.toasts = [...state.toasts, { id: ++toastId, msg, warn, sticky }].slice(-MAX_TOASTS);
   toastFn();
+}
+
+/**
+ * Ferme une notification, désignée par son identifiant ou par son texte.
+ * @param {number | string} which
+ */
+export function dropStatus(which) {
+  const before = state.toasts.length;
+  state.toasts = state.toasts.filter((t) => t.id !== which && t.msg !== which);
+  if (state.toasts.length !== before) toastFn();
 }
 
 // ------------------------------------------------------------ Écritures en file
