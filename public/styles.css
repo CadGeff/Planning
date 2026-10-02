@@ -66,7 +66,10 @@
   --cat-gris: #737a94;
   --hl: 17%;
   --hl-strong: 26%; /* intensité du surligneur */
-  --today: color-mix(in srgb, var(--accent) 4%, transparent);
+  /* Aujourd'hui : teinte de l'accent et liseré. Week-end : gris neutre, sans liseré. */
+  --today: color-mix(in srgb, var(--accent) 10%, transparent);
+  --today-edge: color-mix(in srgb, var(--accent) 45%, transparent);
+  --weekend: color-mix(in srgb, var(--ink) 4.5%, transparent);
   --shadow: 0 1px 2px rgba(27, 33, 64, 0.07), 0 10px 30px rgba(27, 33, 64, 0.12);
   --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --f-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -96,7 +99,9 @@
     --cat-gris: #9aa1ba;
     --hl: 22%;
     --hl-strong: 32%;
-    --today: color-mix(in srgb, var(--accent) 6%, transparent);
+    --today: color-mix(in srgb, var(--accent) 9%, transparent);
+    --today-edge: color-mix(in srgb, var(--accent) 50%, transparent);
+    --weekend: color-mix(in srgb, #000 22%, transparent);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 34px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
@@ -120,7 +125,9 @@
   --cat-gris: #9aa1ba;
   --hl: 22%;
   --hl-strong: 32%;
-  --today: color-mix(in srgb, var(--accent) 6%, transparent);
+  --today: color-mix(in srgb, var(--accent) 9%, transparent);
+  --today-edge: color-mix(in srgb, var(--accent) 50%, transparent);
+  --weekend: color-mix(in srgb, #000 22%, transparent);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 34px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }
@@ -608,14 +615,24 @@ kbd {
 .hd.past .dd {
   color: var(--ink-3);
 }
+.hd.weekend {
+  background: linear-gradient(var(--weekend), var(--weekend)), var(--sheet);
+}
 .hd.today {
   background: linear-gradient(var(--today), var(--today)), var(--sheet);
+  box-shadow:
+    inset 1px 0 0 var(--today-edge),
+    inset -1px 0 0 var(--today-edge),
+    inset 0 3px 0 var(--accent);
 }
 .hd.today .dd {
   color: var(--sheet);
   background: var(--margin);
   border-radius: 6px;
   padding: 2px 6px;
+  /* La pastille déborde de 2 px en haut et en bas sans agrandir la ligne :
+     le nom du jour reste à la même hauteur que dans les autres colonnes. */
+  margin-block: -2px;
 }
 .hd.gut {
   border-right: 2px solid var(--margin);
@@ -637,8 +654,14 @@ kbd {
   min-width: 0;
   min-height: 44px;
 }
+.todo.weekend {
+  background: var(--weekend);
+}
 .todo.today {
   background: var(--today);
+  box-shadow:
+    inset 1px 0 0 var(--today-edge),
+    inset -1px 0 0 var(--today-edge);
 }
 .todo.gut {
   border-right: 2px solid var(--margin);
@@ -753,10 +776,13 @@ kbd {
   background-image: none;
 }
 .col.weekend {
-  background-color: color-mix(in srgb, var(--rule-fine) 35%, transparent);
+  background-color: var(--weekend);
 }
 .col.today {
   background-color: var(--today);
+  box-shadow:
+    inset 1px 0 0 var(--today-edge),
+    inset -1px 0 0 var(--today-edge);
 }
 .hl {
   position: absolute;

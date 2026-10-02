@@ -93,7 +93,8 @@ export function render() {
       endH = Math.max(endH, Math.ceil(toMin(e.to) / 60));
     }
     const when = s === todayS ? "today" : s < todayS ? "past" : "";
-    return { d, s, when, timed: layout(timed), untimed: occ.filter((it) => !(it.from && it.to)) };
+    const cls = `${when}${dow(d) >= 5 ? " weekend" : ""}`;
+    return { d, s, when, cls, timed: layout(timed), untimed: occ.filter((it) => !(it.from && it.to)) };
   });
   endH = Math.min(endH, 24);
   renderLegend(perDay, days.length);
@@ -106,12 +107,12 @@ export function render() {
 
   let h = `<div class="hd gut" aria-hidden="true"></div>`;
   for (const p of perDay)
-    h += `<div class="hd day ${p.when}"><span class="dn">${DN[dow(p.d)]}</span><span class="dd">${p.d.getDate()}</span></div>`;
+    h += `<div class="hd day ${p.cls}"><span class="dn">${DN[dow(p.d)]}</span><span class="dd">${p.d.getDate()}</span></div>`;
 
   // Ligne « À faire » : tâches sans heure.
   h += `<div class="todo gut"><span>À faire</span></div>`;
   for (const p of perDay) {
-    h += `<div class="todo day ${p.when}"><ul>`;
+    h += `<div class="todo day ${p.cls}"><ul>`;
     if (!p.untimed.length) h += `<li class="empty">—</li>`;
     for (const it of p.untimed) {
       const dn = isDone(it, p.s);
@@ -131,7 +132,7 @@ export function render() {
   const now = new Date();
   const nowM = now.getHours() * 60 + now.getMinutes();
   for (const p of perDay) {
-    h += `<div class="col day ${p.when}${dow(p.d) >= 5 ? " weekend" : ""}" data-col="${p.s}">`;
+    h += `<div class="col day ${p.cls}" data-col="${p.s}">`;
     if (p.when === "today" && nowM >= startH * 60 && nowM <= endH * 60)
       h += `<div class="now" data-top="${y(nowM)}"></div>`;
     for (const e of p.timed) {
