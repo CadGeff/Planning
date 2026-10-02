@@ -90,7 +90,8 @@
             ⋯
           </button>
           <div class="menu" id="menu" role="menu" hidden>
-            <button role="menuitem" id="m-export">Exporter mon planning (JSON)</button>
+            <button role="menuitem" id="m-export" aria-describedby="m-backup">Exporter mon planning (JSON)</button>
+            <div class="note" id="m-backup"></div>
             <button role="menuitem" id="m-import">Importer un fichier JSON</button>
             <button role="menuitem" id="m-cats">Renommer les catégories</button>
             <button role="menuitem" id="m-reset" hidden>Réinitialiser la démo</button>

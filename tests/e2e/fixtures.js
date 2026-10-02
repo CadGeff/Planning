@@ -32,6 +32,8 @@ export async function mockSupabase(page, init = {}) {
     settings: null,
     log: [],
     samePasswordOnce: false,
+    // Nombre de requêtes à faire échouer (panne passagère) : { itemsGet, itemsPost }.
+    fail: {},
     key: "sb_publishable_test",
     ...init,
   };
@@ -135,6 +137,11 @@ export async function mockSupabase(page, init = {}) {
           m === "GET" ? 200 : 403,
           m === "GET" ? [] : { code: "42501", message: "new row violates row-level security policy" },
         );
+      const outage = m === "GET" ? "itemsGet" : m === "POST" ? "itemsPost" : null;
+      if (outage && state.fail[outage] > 0) {
+        state.fail[outage]--;
+        return json(route, 503, { message: "Service Unavailable" });
+      }
       if (m === "GET") return json(route, 200, state.items);
       if (m === "POST") {
         for (const row of [].concat(body)) {

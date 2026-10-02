@@ -24,6 +24,7 @@ async function codeRequired() {
   mfaFactorId = st.factorId;
   state.items = [];
   state.loaded = false;
+  state.hasData = false;
   showCodeStep();
   return true;
 }
@@ -45,6 +46,7 @@ export async function reload({ silent = false, mfaChecked = false } = {}) {
       await Store.saveMany(state.items.map(clone));
     } else state.items = list || [];
     state.loaded = true;
+    state.hasData = true;
     if (!silent || state.status.warn) setStatus("");
     await loadSettings();
     render();
@@ -154,6 +156,7 @@ export function initSession() {
   Store.onSignedOut(() => {
     state.items = [];
     state.loaded = false;
+    state.hasData = false;
     state.email = null;
     state.labels = cleanLabels(null);
     showLogin();

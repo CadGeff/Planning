@@ -1,7 +1,15 @@
 // Menu ⋯ : export / import JSON, démo, thème, compte.
 
 import { ds } from "./recurrence.js";
-import { DEFAULT_LABELS, sample, sanitize } from "./items.js";
+import { DEFAULT_LABELS, cleanLabels, sample } from "./items.js";
+import {
+  MAX_FILE_BYTES,
+  backupReminder,
+  buildExport,
+  isDefaultLabels,
+  readExport,
+  withoutDuplicates,
+} from "./backup.js";
 import { Store } from "./store.js";
 import { state, clone, render, setStatus, tracked, todayDate } from "./state.js";
 import { $, field } from "./dom.js";
@@ -18,6 +26,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 export const isMenuOpen = () => !menu.hidden;
 
 function openMenu() {
+  syncBackupNote();
   menu.hidden = false;
   menuBtn.setAttribute("aria-expanded", "true");
   menuItems()[0]?.focus();
@@ -45,12 +54,57 @@ export function syncMenu() {
     : supa
       ? `Connecté : ${state.email || "compte Supabase"}`
       : "Mode local : données dans ce navigateur.";
+  syncBackupNote();
 }
 
 // ------------------------------------------------------------ Export / import
+// Date du dernier export fait sur cet appareil : c'est ici que se trouve le fichier.
+const LAST_EXPORT_KEY = "semainier.lastExport";
+
+function lastExport() {
+  try {
+    return localStorage.getItem(LAST_EXPORT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Ligne « Dernière sauvegarde » du menu, et pastille sur le bouton ⋯ quand elle date. */
+function syncBackupNote() {
+  const demo = Store.mode === "demo";
+  const reminder = backupReminder(lastExport());
+  const late = !demo && reminder.late;
+  const note = $("m-backup");
+  note.hidden = demo;
+  note.textContent = demo ? "" : reminder.text;
+  note.classList.toggle("late", late);
+  menuBtn.classList.toggle("has-note", late);
+  menuBtn.setAttribute("aria-label", late ? "Plus d'options (sauvegarde à refaire)" : "Plus d'options");
+}
+
+/**
+ * Noms de catégories à reprendre du fichier, ou null. Ils ne remplacent jamais des noms
+ * personnalisés : on relit ceux du stockage, sans se fier à l'affichage, qui retombe sur
+ * les noms par défaut quand leur chargement a échoué.
+ * @param {Record<string, string> | null} fromFile
+ */
+async function labelsToRestore(fromFile) {
+  if (!fromFile || isDefaultLabels(fromFile) || !isDefaultLabels(state.labels)) return null;
+  try {
+    const saved = cleanLabels((await Store.getSettings())?.catLabels);
+    return isDefaultLabels(saved) ? fromFile : null;
+  } catch {
+    return null;
+  }
+}
+
+const NOT_LOADED = "Le planning n'est pas chargé : réessaie dans un instant, ou recharge la page.";
+
 function exportJson() {
   closeMenu(true);
-  const data = { app: "semainier", format: 1, exportedAt: new Date().toISOString(), items: state.items.map(clone) };
+  // Tant que le planning n'a pas été lu, la mémoire est vide : l'export le serait aussi.
+  if (!state.hasData) return setStatus(NOT_LOADED, true);
+  const data = buildExport(state.items.map(clone), state.labels);
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -59,31 +113,53 @@ function exportJson() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  if (Store.mode !== "demo") {
+    try {
+      localStorage.setItem(LAST_EXPORT_KEY, data.exportedAt);
+    } catch {
+      /* stockage indisponible : pas de rappel sur cet appareil */
+    }
+    syncBackupNote();
+  }
   setStatus(`Export téléchargé (${plural(data.items.length, "élément")}).`);
 }
 
-/** Importe un fichier JSON : chaque élément est revalidé, les invalides sont ignorés. */
+/**
+ * Importe une sauvegarde : chaque élément est revalidé, les invalides sont ignorés,
+ * et ceux que le planning contient déjà ne sont pas ajoutés une seconde fois.
+ * L'affichage n'est modifié qu'une fois l'écriture réussie : après un échec,
+ * relancer le même import reprend là où il s'est arrêté.
+ * @param {File} file
+ */
 async function importJson(file) {
-  let parsed;
-  try {
-    parsed = JSON.parse(await file.text());
-  } catch {
-    return setStatus("Ce fichier n'est pas un JSON valide.", true);
-  }
-  const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : null;
-  if (!list) return setStatus("Fichier non reconnu : il faut un export du Semainier.", true);
-  const clean = list.map(sanitize).filter(Boolean);
-  if (!clean.length) return setStatus("Aucun élément valide dans ce fichier.", true);
-  state.items.push(...clean);
-  render();
-  try {
-    await tracked(() => Store.saveMany(clean.map(clone)));
-    const skipped = list.length - clean.length;
-    const s = clean.length > 1 ? "s" : "";
-    setStatus(`${clean.length} élément${s} importé${s}${skipped ? `, ${plural(skipped, "ignoré")} (invalides)` : ""}.`);
-  } catch (err) {
-    setStatus(err.message || "Import impossible.", true);
-  }
+  // La comparaison avec un planning pas encore lu ne verrait aucun doublon.
+  if (!state.hasData) return setStatus(NOT_LOADED, true);
+  if (file.size > MAX_FILE_BYTES) return setStatus("Fichier trop volumineux (2 Mo maximum).", true);
+  const read = readExport(await file.text());
+  if (read.ok === false) return setStatus(read.error, true);
+  const labels = await labelsToRestore(read.labels);
+  if (!read.items.length && !labels) return setStatus("Aucun élément valide dans ce fichier.", true);
+  const { fresh, duplicates } = withoutDuplicates(read.items, state.items);
+  if (!fresh.length && !labels) return setStatus("Rien à importer : tout le fichier est déjà dans ton planning.");
+  await tracked(async () => {
+    if (fresh.length) {
+      await Store.saveMany(fresh.map(clone));
+      state.items.push(...fresh);
+      render();
+    }
+    if (labels) {
+      await Store.saveSettings({ catLabels: labels });
+      state.labels = labels;
+      render();
+    }
+  });
+  const s = fresh.length > 1 ? "s" : "";
+  const parts = fresh.length ? [`${fresh.length} élément${s} importé${s}`] : [];
+  if (duplicates) parts.push(`${duplicates} déjà présent${duplicates > 1 ? "s" : ""}`);
+  if (read.invalid) parts.push(`${plural(read.invalid, "ignoré")} (invalides)`);
+  if (labels) parts.push("noms des catégories restaurés");
+  const msg = parts.join(", ");
+  setStatus(`${msg[0].toUpperCase()}${msg.slice(1)}.`);
 }
 
 // ------------------------------------------------------------------ Démo
@@ -164,7 +240,7 @@ export function initMenu() {
   fileInput.onchange = () => {
     const file = fileInput.files?.[0];
     fileInput.value = "";
-    if (file) importJson(file);
+    if (file) importJson(file).catch((err) => setStatus(err?.message || "Import impossible.", true));
   };
   $("m-cats").onclick = openCats;
   $("m-reset").onclick = resetDemo;
@@ -181,6 +257,10 @@ export function initMenu() {
     /** @type {HTMLElement} */ (b).onclick = () => applyTheme(/** @type {HTMLElement} */ (b).dataset.themeSet);
   }
   applyTheme(currentTheme());
+  // Un onglet laissé ouvert plusieurs semaines doit quand même afficher le rappel.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) syncBackupNote();
+  });
   // Entrer dans la démo ou en sortir change de mode de stockage : on recharge.
   window.addEventListener("hashchange", () => location.reload());
 }

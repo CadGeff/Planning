@@ -31,7 +31,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Repères visuels** : jours passés atténués, colonne du jour, ligne de l'heure actuelle, compteur des tâches du jour.
 - **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
 - **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine, <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
-- **Export et import JSON** pour sauvegarder ou migrer ses données.
+- **Sauvegarde et restauration** : l'export JSON contient le planning et les noms des catégories ; l'import n'ajoute que ce qui manque, sans doublon. Le menu rappelle quand la dernière sauvegarde date de plus de 30 jours.
 - **Double authentification (TOTP) optionnelle**, activable depuis le menu : QR code à scanner avec une application comme Aegis, puis code à 6 chiffres à chaque nouvelle connexion. Elle est imposée par la base de données, pas seulement par l'interface.
 - **Application installable (PWA)** : icône sur l'écran d'accueil, ouverture hors connexion.
 
@@ -100,7 +100,7 @@ Le dépôt est public et la clé Supabase est visible dans le navigateur, comme 
 - **Double authentification optionnelle, vérifiée côté serveur** : quand un facteur TOTP est actif, une politique RLS *restrictive* exige un jeton de niveau `aal2` sur `items` et `settings`. Un mot de passe volé donne une session `aal1`, qui ne lit ni n'écrit rien, même en appelant l'API directement. La fonction de contrôle vit dans un schéma `private` non exposé par l'API.
 - **Sessions** : changer de mot de passe ou activer la 2FA révoque les autres sessions ; « Se déconnecter » ferme la session sur tous les appareils.
 - **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, forme des objets JSON.
-- **Entrées non fiables** : les imports JSON sont revalidés champ par champ et tout le texte affiché est échappé.
+- **Entrées non fiables** : les imports JSON sont limités à 2 Mo et revalidés champ par champ, et tout le texte affiché est échappé.
 - **Pas de tiers** : ni CDN, ni polices distantes, ni outil d'analyse d'audience. En-tête `no-referrer`.
 - **Vérifié automatiquement** : les tests de bout en bout contrôlent à chaque push les en-têtes, l'absence de violation de CSP, le blocage d'un script ou d'un style injecté, le refus d'affichage dans un cadre, l'échappement des titres et le parcours 2FA.
 
@@ -128,6 +128,7 @@ Un planning semble anodin, mais il décrit **où l'on est et quand** : horaires 
 | Exfiltration par un script injecté malgré tout | `connect-src` limité au seul projet Supabase de l'application. |
 | Page affichée dans un cadre piégé (clickjacking) | `frame-ancestors 'none'` et `X-Frame-Options: DENY` ; refus en JavaScript en secours. |
 | Bibliothèque compromise sur un CDN | Aucun CDN : `supabase-js` et les polices sont versionnés dans le dépôt. |
+| Perte des données (table vidée, projet supprimé par erreur) | Export JSON à la demande, rappel au bout de 30 jours, restauration sans doublon. Pas de sauvegarde automatique : elle obligerait à confier une clé `service_role` à un robot, ce qui contournerait RLS et la 2FA. |
 | Clé secrète commitée par erreur | L'application refuse de démarrer avec une clé `service_role` / `sb_secret_`, et GitHub bloque le push des secrets connus. |
 
 **Pourquoi la 2FA est optionnelle**
@@ -202,8 +203,8 @@ Chaque push déclenche la [CI GitHub Actions](.github/workflows/ci.yml) :
 | Lint | ESLint | Erreurs courantes, variables inutilisées, `===` obligatoire, pas de `var` |
 | Format | Prettier | Mise en forme homogène de tout le code |
 | Types | TypeScript sur annotations JSDoc | Cohérence des types sans étape de compilation (`jsconfig.json`) |
-| Tests unitaires | `node:test` | Récurrence, placement des créneaux, validation des imports, traduction des erreurs |
-| Tests de bout en bout | Playwright (Chromium) | Démo, connexion, mot de passe, 2FA, sécurité, hors connexion |
+| Tests unitaires | `node:test` | Récurrence, placement des créneaux, validation des imports, sauvegarde et restauration, traduction des erreurs |
+| Tests de bout en bout | Playwright (Chromium) | Démo, connexion, mot de passe, 2FA, sauvegarde, sécurité, hors connexion |
 
 Les tests de bout en bout tournent sur le site servi avec ses en-têtes de production, et **simulent Supabase** ([`tests/e2e/fixtures.js`](tests/e2e/fixtures.js)) : aucun test ne touche la vraie base, et la simulation reproduit la politique RLS de la 2FA (aucune donnée sans session `aal2`). Dependabot propose chaque mois les mises à jour des outils et des actions, validées par la CI avant fusion.
 
@@ -222,7 +223,7 @@ public/                   le site, publié tel quel
     app.js                point d'entrée : branchement des modules, clavier
     board.js              grille, légende, navigation
     form.js, detail.js    création / modification, détail d'une occurrence
-    menu.js               menu, export / import, thème
+    menu.js               menu, export / import, rappel de sauvegarde, thème
     categories.js         noms des catégories
     account.js            mot de passe, double authentification
     session.js            connexion, étape du code, chargement, démarrage
@@ -231,6 +232,7 @@ public/                   le site, publié tel quel
     recurrence.js         dates et récurrence          ┐
     layout.js             placement des créneaux       │ fonctions pures,
     items.js              modèle, validation, exemple  │ testées sous Node
+    backup.js             sauvegarde et restauration   │
     errors.js             traduction des erreurs       ┘
     dom.js, ids.js        utilitaires
   vendor/                 supabase-js 2.117.2 (MIT)

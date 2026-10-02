@@ -297,6 +297,30 @@ kbd {
   color: var(--ink-3);
   overflow-wrap: anywhere;
 }
+.menu .note {
+  padding: 0 10px 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+/* En retard : texte foncé et gras plutôt que rouge, pour garder un contraste suffisant en 12 px. */
+.menu .note.late {
+  color: var(--ink);
+  font-weight: 600;
+}
+/* Pastille sur le bouton ⋯ : la dernière sauvegarde date de plus de 30 jours. */
+.btn.icon.has-note {
+  position: relative;
+}
+.btn.icon.has-note::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--margin);
+}
 .menu .danger-item {
   color: var(--margin);
 }

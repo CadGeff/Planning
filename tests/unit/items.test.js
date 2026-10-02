@@ -84,3 +84,16 @@ test("données d'exemple : toutes valides et visibles dans la semaine", () => {
   const reading = items.find((it) => it.title === "Lire 20 pages");
   assert.deepEqual(Object.keys(reading.done), ["2026-09-28", "2026-09-29"], "jours passés cochés");
 });
+
+test("import : rejette les champs du mauvais type et les dates impossibles", () => {
+  const ok = { title: "x", kind: "task", start: "2026-09-29", recur: "daily" };
+  assert.ok(sanitize(ok));
+  for (const start of [["2026-09-29"], 20260929, "2026-02-30", "2026-13-01", "2026-00-10"]) {
+    assert.equal(sanitize({ ...ok, start }), null, JSON.stringify(start));
+  }
+  const noTime = sanitize({ ...ok, from: ["09:00"], to: ["10:00"] });
+  assert.equal(noTime.from, undefined);
+  assert.equal(sanitize({ ...ok, kind: "block", from: ["09:00"], to: ["10:00"] }), null);
+  const flags = sanitize({ ...ok, done: { "2026-09-29": true, "2026-02-31": true, __proto__: true } });
+  assert.deepEqual(Object.keys(flags.done), ["2026-09-29"]);
+});

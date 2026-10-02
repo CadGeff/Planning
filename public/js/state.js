@@ -16,6 +16,8 @@ export const state = {
   /** @type {Item[]} */
   items: [],
   loaded: false,
+  /** Le planning a été lu au moins une fois : `items` reflète le stockage (faux après un chargement en échec). */
+  hasData: false,
   /** @type {string|null} */
   email: null,
   /** Jour sélectionné : la semaine affichée est celle qui le contient. */

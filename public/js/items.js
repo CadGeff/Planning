@@ -37,6 +37,10 @@ export const LABEL_MAX = 30;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** Chaîne "AAAA-MM-JJ" désignant un jour qui existe (pas de 30 février). @param {unknown} v */
+const isDate = (v) => typeof v === "string" && DATE_RE.test(v) && ds(parse(v)) === v;
+/** @param {unknown} v */
+const isTime = (v) => typeof v === "string" && TIME_RE.test(v);
 
 /**
  * Noms des catégories : 30 caractères max, nom par défaut si vide ou invalide.
@@ -64,7 +68,7 @@ export function sanitize(raw) {
   if (!raw || typeof raw !== "object") return null;
   const r = /** @type {Record<string, any>} */ (raw);
   const title = typeof r.title === "string" ? r.title.trim().slice(0, TITLE_MAX) : "";
-  if (!title || !KINDS.includes(r.kind) || !DATE_RE.test(r.start || "")) return null;
+  if (!title || !KINDS.includes(r.kind) || !isDate(r.start)) return null;
   /** @type {Item} */
   const it = {
     id: newId(),
@@ -76,7 +80,7 @@ export function sanitize(raw) {
     done: {},
     skipped: {},
   };
-  if (TIME_RE.test(r.from || "") && TIME_RE.test(r.to || "") && toMin(r.to) > toMin(r.from)) {
+  if (isTime(r.from) && isTime(r.to) && toMin(r.to) > toMin(r.from)) {
     it.from = r.from;
     it.to = r.to;
   } else if (it.kind === "block") return null;
@@ -86,7 +90,7 @@ export function sanitize(raw) {
   }
   for (const f of /** @type {const} */ (["done", "skipped"])) {
     if (r[f] && typeof r[f] === "object") {
-      for (const k of Object.keys(r[f])) if (DATE_RE.test(k) && r[f][k] === true) it[f][k] = true;
+      for (const k of Object.keys(r[f])) if (isDate(k) && r[f][k] === true) it[f][k] = true;
     }
   }
   return it;

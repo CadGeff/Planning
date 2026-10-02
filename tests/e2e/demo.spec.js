@@ -109,16 +109,70 @@ test("import : rejette un fichier invalide, filtre les éléments incorrects", a
   await expect(page.locator(".todo.day.today")).toContainText("Importé");
 });
 
-test("export : télécharge tout le planning en JSON", async ({ page }) => {
+/** Télécharge l'export depuis le menu et renvoie son contenu. */
+async function exportData(page) {
   await page.getByRole("button", { name: "Plus d'options" }).click();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("menuitem", { name: "Exporter mon planning (JSON)" }).click(),
   ]);
-  expect(download.suggestedFilename()).toBe(`semainier-${TODAY}.json`);
-  const data = JSON.parse(await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString()));
+  const chunks = await (await download.createReadStream()).toArray();
+  return { name: download.suggestedFilename(), data: JSON.parse(Buffer.concat(chunks).toString()) };
+}
+
+const asFile = (data) => ({ name: "s.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
+
+test("export : télécharge tout le planning et les noms des catégories", async ({ page }) => {
+  const { name, data } = await exportData(page);
+  expect(name).toBe(`semainier-${TODAY}.json`);
   expect(data.app).toBe("semainier");
+  expect(data.format).toBe(2);
   expect(data.items).toHaveLength(11);
+  expect(data.labels.bleu).toBe("Travail");
+  // La démo ne laisse aucune trace de sauvegarde sur l'appareil.
+  expect(await page.evaluate(() => localStorage.getItem("semainier.lastExport"))).toBeNull();
+  await page.getByRole("button", { name: "Plus d'options" }).click();
+  await expect(page.locator("#m-backup")).toBeHidden();
+});
+
+test("import : réimporter sa sauvegarde ne crée aucun doublon", async ({ page }) => {
+  const { data } = await exportData(page);
+  const before = await page.locator(".ev").count();
+  const input = page.locator("#importFile");
+  await input.setInputFiles(asFile(data));
+  await expect(page.locator("#bar")).toContainText("Rien à importer : tout le fichier est déjà dans ton planning.");
+  expect(await page.locator(".ev").count()).toBe(before);
+
+  data.items.push({ title: "Seul manquant", kind: "task", start: TODAY, recur: "none", cat: "vert" });
+  await input.setInputFiles(asFile(data));
+  await expect(page.locator("#bar")).toContainText("1 élément importé, 11 déjà présents.");
+  await expect(page.locator(".todo.day.today")).toContainText("Seul manquant");
+  await page.reload();
+  await expect(page.locator(".todo.day.today")).toContainText("Seul manquant");
+});
+
+test("import : restaure les noms des catégories, sans écraser des noms personnalisés", async ({ page }) => {
+  const input = page.locator("#importFile");
+  const item = (title) => ({ title, kind: "task", start: TODAY, recur: "none", cat: "bleu" });
+  await input.setInputFiles(asFile({ format: 2, labels: { bleu: "Boulot" }, items: [item("Un")] }));
+  await expect(page.locator("#bar")).toContainText("1 élément importé, noms des catégories restaurés.");
+  await expect(page.locator("#legend")).toContainText("Boulot");
+  await page.reload();
+  await expect(page.locator("#legend")).toContainText("Boulot");
+
+  await input.setInputFiles(asFile({ format: 2, labels: { bleu: "Autre nom" }, items: [item("Deux")] }));
+  await expect(page.locator("#bar")).toContainText("1 élément importé.");
+  await expect(page.locator("#legend")).toContainText("Boulot");
+  await expect(page.locator("#legend")).not.toContainText("Autre nom");
+});
+
+test("import : refuse un fichier de plus de 2 Mo", async ({ page }) => {
+  await page.locator("#importFile").setInputFiles({
+    name: "gros.json",
+    mimeType: "application/json",
+    buffer: Buffer.alloc(2 * 1024 * 1024 + 1, " "),
+  });
+  await expect(page.locator("#bar")).toContainText("Fichier trop volumineux (2 Mo maximum).");
 });
 
 test("thème sombre mémorisé sur l'appareil", async ({ page }) => {
