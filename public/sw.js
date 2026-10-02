@@ -5,7 +5,7 @@
  * Pense à incrémenter CACHE quand tu ajoutes ou renommes un fichier de SHELL
  * (le test E2E offline.spec.js échoue si un fichier listé n'existe pas).
  */
-const CACHE = "semainier-v10";
+const CACHE = "semainier-v11";
 const SHELL = [
   "./",
   "index.html",
@@ -34,8 +34,7 @@ const SHELL = [
   "manifest.webmanifest",
   "icons/icon.svg",
   "icons/icon-192.png",
-  "fonts/bricolage-grotesque-latin-700-normal.woff2",
-  "fonts/bricolage-grotesque-latin-800-normal.woff2",
+  "fonts/bodoni-moda-latin-800-normal.woff2",
   "fonts/instrument-sans-latin-400-normal.woff2",
   "fonts/instrument-sans-latin-500-normal.woff2",
   "fonts/instrument-sans-latin-600-normal.woff2",

@@ -4,16 +4,10 @@
 
 /* ---------- Polices auto-hébergées (SIL OFL, voir fonts/*.LICENSE) ---------- */
 @font-face {
-  font-family: "Bricolage Grotesque";
-  font-weight: 700;
-  font-display: swap;
-  src: url("fonts/bricolage-grotesque-latin-700-normal.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Bricolage Grotesque";
+  font-family: "Bodoni Moda";
   font-weight: 800;
   font-display: swap;
-  src: url("fonts/bricolage-grotesque-latin-800-normal.woff2") format("woff2");
+  src: url("fonts/bodoni-moda-latin-800-normal.woff2") format("woff2");
 }
 @font-face {
   font-family: "Instrument Sans";
@@ -56,9 +50,13 @@
   --rule: #c5ceea;
   --rule-fine: #e6eaf6;
   --margin: #d9536a;
-  --accent: #2d47c9;
+  /* Une seule couleur vive, le rouge de la marge : l'action principale est à l'encre. */
+  --accent: #1b2140;
   --accent-ink: #ffffff;
-  --focus: #2d47c9;
+  --focus: #1b2140;
+  /* Formes strictes : commandes presque droites, panneaux à peine adoucis. */
+  --r-ctl: 3px;
+  --r-panel: 6px;
   --cat-bleu: #3f63e0;
   --cat-vert: #23946a;
   --cat-ambre: #c98712;
@@ -67,11 +65,13 @@
   --hl: 17%;
   --hl-strong: 26%; /* intensité du surligneur */
   /* Aujourd'hui : cadre rouge fin, fond inchangé pour ne se confondre avec aucune catégorie.
-     Week-end : gris neutre, sans cadre. Un samedi courant garde donc son gris, dans le cadre. */
+     Week-end : fond teinté, sans cadre. Un samedi courant garde donc sa teinte, dans le cadre. */
   --today-edge: color-mix(in srgb, var(--margin) 70%, transparent);
-  --weekend: color-mix(in srgb, var(--ink) 4.5%, transparent);
+  /* Beige « papier » : assez soutenu pour garder le même caractère d'un écran à l'autre. */
+  --weekend: #f6f1e7;
   --shadow: 0 1px 2px rgba(27, 33, 64, 0.07), 0 10px 30px rgba(27, 33, 64, 0.12);
-  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  /* Titres et numéros des jours : une didone, à empattements très fins. */
+  --f-display: "Bodoni Moda", "Bodoni 72", Didot, Georgia, serif;
   --f-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --hour: 52px;
@@ -89,9 +89,9 @@
     --rule: #2b3350;
     --rule-fine: #1d2335;
     --margin: #b9506a;
-    --accent: #8199ff;
+    --accent: #e4e8f4;
     --accent-ink: #0d1122;
-    --focus: #8199ff;
+    --focus: #aab8ff;
     --cat-bleu: #7290ff;
     --cat-vert: #4cc390;
     --cat-ambre: #e6ad48;
@@ -114,9 +114,9 @@
   --rule: #2b3350;
   --rule-fine: #1d2335;
   --margin: #b9506a;
-  --accent: #8199ff;
+  --accent: #e4e8f4;
   --accent-ink: #0d1122;
-  --focus: #8199ff;
+  --focus: #aab8ff;
   --cat-bleu: #7290ff;
   --cat-vert: #4cc390;
   --cat-ambre: #e6ad48;
@@ -167,7 +167,7 @@ kbd {
   font-size: 11px;
   border: 1px solid var(--rule);
   border-bottom-width: 2px;
-  border-radius: 4px;
+  border-radius: var(--r-ctl);
   padding: 0 5px;
   background: var(--sheet);
   color: var(--ink-2);
@@ -201,7 +201,7 @@ kbd {
   font-family: var(--f-display);
   font-weight: 800;
   font-size: 30px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.005em;
   margin: 0;
   line-height: 1;
 }
@@ -221,9 +221,9 @@ kbd {
   gap: 6px;
 }
 .btn {
-  border: 1px solid var(--rule);
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   background: var(--sheet);
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   padding: 7px 12px;
   cursor: pointer;
   line-height: 1.2;
@@ -241,7 +241,12 @@ kbd {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
+  /* Petites capitales espacées pour l'action principale. */
+  font-size: 11.5px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 9px 16px;
 }
 .btn.primary:hover {
   filter: brightness(1.08);
@@ -272,7 +277,7 @@ kbd {
   min-width: 240px;
   background: var(--sheet);
   border: 1px solid var(--rule);
-  border-radius: 10px;
+  border-radius: var(--r-panel);
   box-shadow: var(--shadow);
   padding: 6px;
   display: flex;
@@ -282,7 +287,7 @@ kbd {
   text-align: left;
   background: none;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   padding: 8px 10px;
   cursor: pointer;
 }
@@ -347,14 +352,14 @@ kbd {
   display: flex;
   gap: 2px;
   border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   padding: 2px;
   background: var(--paper);
 }
 .menu .theme-seg button {
   padding: 4px 9px;
   font-size: 12.5px;
-  border-radius: 6px;
+  border-radius: 2px;
 }
 .menu .theme-seg button[aria-checked="true"] {
   background: var(--sheet);
@@ -376,7 +381,7 @@ kbd {
   gap: 7px;
   border: 1px solid transparent;
   background: none;
-  border-radius: 999px;
+  border-radius: var(--r-ctl);
   padding: 3px 10px 3px 8px;
   cursor: pointer;
   color: var(--ink-2);
@@ -442,7 +447,7 @@ kbd {
   align-items: center;
   gap: 8px;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-ctl);
   background: var(--sheet);
   border: 1px solid var(--rule-fine);
   font-variant-numeric: tabular-nums;
@@ -513,7 +518,7 @@ kbd {
   background: var(--sheet);
   border: 1px solid var(--rule);
   border-left: 4px solid var(--accent);
-  border-radius: 10px;
+  border-radius: var(--r-panel);
   box-shadow: var(--shadow);
   font-size: 13.5px;
   color: var(--ink);
@@ -537,7 +542,7 @@ kbd {
   min-width: 0;
   border: 1px solid var(--rule-fine);
   background: var(--sheet);
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   padding: 6px 0;
   cursor: pointer;
   display: flex;
@@ -553,7 +558,7 @@ kbd {
 }
 .strip button span {
   font-family: var(--f-display);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 17px;
 }
 .strip button.past span {
@@ -576,7 +581,7 @@ kbd {
 .board {
   background: var(--sheet);
   border: 1px solid var(--rule);
-  border-radius: 12px;
+  border-radius: var(--r-panel);
   display: grid;
   grid-template-columns: 58px repeat(var(--n), minmax(0, 1fr));
 }
@@ -593,7 +598,7 @@ kbd {
   min-width: 0;
 }
 .hd:first-child {
-  border-top-left-radius: 12px;
+  border-top-left-radius: var(--r-panel);
 }
 .hd .dn {
   font-size: 11px;
@@ -604,7 +609,7 @@ kbd {
 }
 .hd .dd {
   font-family: var(--f-display);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 20px;
   line-height: 1;
 }
@@ -984,7 +989,7 @@ kbd {
 .sheet {
   background: var(--sheet);
   border: 1px solid var(--rule);
-  border-radius: 14px;
+  border-radius: var(--r-panel);
   box-shadow: var(--shadow);
   width: min(460px, 100%);
   max-height: calc(100% - 8px);
@@ -996,10 +1001,10 @@ kbd {
 }
 .sheet h2 {
   font-family: var(--f-display);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 21px;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   text-wrap: balance;
 }
 .field {
@@ -1019,7 +1024,7 @@ kbd {
 .inp {
   border: 1px solid var(--rule);
   background: var(--paper);
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   padding: 8px 10px;
   width: 100%;
   min-width: 0;
@@ -1032,7 +1037,7 @@ kbd {
 .seg {
   display: flex;
   border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   padding: 2px;
   gap: 2px;
   background: var(--paper);
@@ -1041,7 +1046,7 @@ kbd {
   flex: 1;
   text-align: center;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: 2px;
   cursor: pointer;
   font-size: 13px;
   position: relative;
@@ -1070,7 +1075,7 @@ kbd {
 .chips button {
   border: 1px solid var(--rule);
   background: var(--paper);
-  border-radius: 999px;
+  border-radius: var(--r-ctl);
   padding: 4px 11px;
   font-size: 12.5px;
   cursor: pointer;
@@ -1101,7 +1106,7 @@ kbd {
   place-items: center;
   width: 34px;
   height: 32px;
-  border-radius: 7px;
+  border-radius: var(--r-ctl);
   border: 1px solid var(--rule);
   cursor: pointer;
   font-size: 12.5px;
@@ -1133,7 +1138,7 @@ kbd {
   align-items: center;
   gap: 7px;
   border: 1px solid var(--rule);
-  border-radius: 999px;
+  border-radius: var(--r-ctl);
   padding: 4px 11px 4px 8px;
   cursor: pointer;
   font-size: 12.5px;
@@ -1228,7 +1233,7 @@ kbd {
   width: min(380px, 100%);
   background: var(--sheet);
   border: 1px solid var(--rule);
-  border-radius: 14px;
+  border-radius: var(--r-panel);
   padding: 24px 24px 24px 64px;
   display: flex;
   flex-direction: column;
@@ -1246,7 +1251,7 @@ kbd {
   font-family: var(--f-display);
   font-weight: 800;
   font-size: 32px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.005em;
   margin: 0 0 2px;
   line-height: 1;
 }
@@ -1284,7 +1289,7 @@ kbd {
   height: 200px;
   padding: 10px;
   background: #fff;
-  border-radius: 10px;
+  border-radius: var(--r-panel);
   border: 1px solid var(--rule);
 }
 .mfa-secret {
@@ -1293,7 +1298,7 @@ kbd {
   color: var(--ink);
   background: var(--paper);
   border: 1px dashed var(--rule);
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   padding: 8px 10px;
   word-break: break-all;
   user-select: all;
@@ -1346,7 +1351,7 @@ kbd {
     display: none;
   }
   .todo.gut {
-    border-top-left-radius: 12px;
+    border-top-left-radius: var(--r-panel);
   }
   .row {
     grid-template-columns: 1fr 1fr;
@@ -1366,6 +1371,7 @@ kbd {
     height: 58px;
     border-radius: 50%;
     padding: 0;
+    letter-spacing: 0;
     font-size: 28px;
     line-height: 1;
     box-shadow: var(--shadow);
