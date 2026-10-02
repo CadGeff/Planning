@@ -26,6 +26,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Créneaux bloqués** : un clic sur une case vide crée un créneau à cette heure, avec un aperçu au survol.
 - **Tâches à cocher**, avec ou sans heure. Les tâches sans heure vont dans la ligne « À faire » du jour.
 - **Récurrence** quotidienne, hebdomadaire (jours au choix) ou mensuelle. Le 31 retombe sur le dernier jour des mois courts.
+- **Report des tâches non faites** : une tâche ponctuelle qui n'a pas été cochée réapparaît le lendemain dans « À faire », sans heure, pendant 7 jours au plus. Elle reste visible à sa date prévue, et la cocher la marque faite partout. Le report est calculé à l'affichage : rien n'est modifié en base tant qu'on ne coche pas.
 - **Cocher ne vaut que pour le jour même** : l'occurrence suivante revient vierge. On peut aussi retirer un seul jour d'une série sans toucher au reste.
 - **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps bloqué par catégorie sur la semaine, et un clic sur une catégorie efface les autres. Les noms sont modifiables et synchronisés entre appareils.
 - **Repères visuels** : jours passés atténués, colonne du jour, ligne de l'heure actuelle, compteur des tâches du jour.
@@ -204,8 +205,8 @@ Chaque push déclenche la [CI GitHub Actions](.github/workflows/ci.yml) :
 | Lint | ESLint | Erreurs courantes, variables inutilisées, `===` obligatoire, pas de `var` |
 | Format | Prettier | Mise en forme homogène de tout le code |
 | Types | TypeScript sur annotations JSDoc | Cohérence des types sans étape de compilation (`jsconfig.json`) |
-| Tests unitaires | `node:test` | Récurrence, placement des créneaux, validation des imports, sauvegarde et restauration, traduction des erreurs |
-| Tests de bout en bout | Playwright (Chromium) | Démo, connexion, mot de passe, 2FA, sauvegarde, sécurité, hors connexion |
+| Tests unitaires | `node:test` | Récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde et restauration, traduction des erreurs |
+| Tests de bout en bout | Playwright (Chromium) | Démo, report des tâches, connexion, mot de passe, 2FA, sauvegarde, sécurité, hors connexion |
 
 Les tests de bout en bout tournent sur le site servi avec ses en-têtes de production, et **simulent Supabase** ([`tests/e2e/fixtures.js`](tests/e2e/fixtures.js)) : aucun test ne touche la vraie base, et la simulation reproduit la politique RLS de la 2FA (aucune donnée sans session `aal2`). Dependabot propose chaque mois les mises à jour des outils et des actions, validées par la CI avant fusion.
 
@@ -232,6 +233,7 @@ public/                   le site, publié tel quel
     store.js              stockage : Supabase, local ou démo
     toast.js              notifications en bas de l'écran
     recurrence.js         dates et récurrence          ┐
+    carry.js              report des tâches non faites │
     layout.js             placement des créneaux       │ fonctions pures,
     items.js              modèle, validation, exemple  │ testées sous Node
     backup.js             sauvegarde et restauration   │
@@ -249,7 +251,6 @@ docs/                     captures du README
 
 ## Feuille de route
 
-- [ ] Report au lendemain des tâches ponctuelles non faites
 - [ ] Vue mois
 - [ ] Glisser-déposer et redimensionner les créneaux à la souris
 - [ ] Synchronisation instantanée entre appareils (aujourd'hui : à chaque retour sur l'onglet)

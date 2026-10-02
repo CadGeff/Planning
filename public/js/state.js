@@ -4,6 +4,8 @@
 
 import { Store } from "./store.js";
 import { DEFAULT_LABELS } from "./items.js";
+import { isDone } from "./recurrence.js";
+import { isOneOff, doneDay } from "./carry.js";
 
 /** @import { Item } from "./items.js" */
 
@@ -127,6 +129,20 @@ export function setDayFlag(id, fieldName, day, on) {
   if (on) map[day] = true;
   else delete map[day];
   it[fieldName] = map;
+  render();
+  return queue(id, () => Store.save(clone(it)));
+}
+
+/**
+ * Coche ou décoche une tâche pour le jour `day`. Une tâche ponctuelle n'a qu'un état :
+ * la cocher retient le jour où elle a été faite, la décocher l'efface, où qu'on clique.
+ * @param {string} id @param {string} day
+ */
+export function toggleDone(id, day) {
+  const it = state.items.find((x) => x.id === id);
+  if (!it) return;
+  if (!isOneOff(it)) return setDayFlag(id, "done", day, !isDone(it, day));
+  it.done = doneDay(it) === null ? { [day]: true } : {};
   render();
   return queue(id, () => Store.save(clone(it)));
 }

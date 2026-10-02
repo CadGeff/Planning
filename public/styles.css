@@ -59,11 +59,14 @@
   --r-panel: 6px;
   --cat-bleu: #3f63e0;
   --cat-vert: #23946a;
-  --cat-ambre: #c98712;
+  --cat-ambre: #d9730d; /* orange : un ambre se confondait avec le beige du week-end */
   --cat-rose: #cc4677;
   --cat-gris: #737a94;
   --hl: 17%;
   --hl-strong: 26%; /* intensité du surligneur */
+  /* Sur le beige du week-end, il faut plus d'encre pour le même relief que sur le blanc. */
+  --hl-weekend: 32%;
+  --hl-strong-weekend: 42%;
   /* Aujourd'hui : cadre rouge fin, fond inchangé pour ne se confondre avec aucune catégorie.
      Week-end : fond teinté, sans cadre. Un samedi courant garde donc sa teinte, dans le cadre. */
   --today-edge: color-mix(in srgb, var(--margin) 70%, transparent);
@@ -94,11 +97,13 @@
     --focus: #aab8ff;
     --cat-bleu: #7290ff;
     --cat-vert: #4cc390;
-    --cat-ambre: #e6ad48;
+    --cat-ambre: #f09a4f;
     --cat-rose: #ef76a2;
     --cat-gris: #9aa1ba;
     --hl: 22%;
     --hl-strong: 32%;
+    --hl-weekend: 22%;
+    --hl-strong-weekend: 32%;
     --today-edge: color-mix(in srgb, var(--margin) 80%, transparent);
     --weekend: color-mix(in srgb, #000 22%, transparent);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 34px rgba(0, 0, 0, 0.5);
@@ -119,11 +124,13 @@
   --focus: #aab8ff;
   --cat-bleu: #7290ff;
   --cat-vert: #4cc390;
-  --cat-ambre: #e6ad48;
+  --cat-ambre: #f09a4f;
   --cat-rose: #ef76a2;
   --cat-gris: #9aa1ba;
   --hl: 22%;
   --hl-strong: 32%;
+  --hl-weekend: 22%;
+  --hl-strong-weekend: 32%;
   --today-edge: color-mix(in srgb, var(--margin) 80%, transparent);
   --weekend: color-mix(in srgb, #000 22%, transparent);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 34px rgba(0, 0, 0, 0.5);
@@ -745,6 +752,19 @@ kbd {
   font-size: 13px;
   line-height: 1.3;
 }
+/* Tâche reportée : jour prévu, en petit sous le titre. */
+.todo .t-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.todo .from {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--ink-3);
+}
 .todo li.done .t-title {
   text-decoration: line-through;
   color: var(--ink-3);
@@ -808,6 +828,8 @@ kbd {
 }
 .col.weekend {
   background-color: var(--weekend);
+  --hl: var(--hl-weekend, 22%);
+  --hl-strong: var(--hl-strong-weekend, 32%);
 }
 .hl {
   position: absolute;

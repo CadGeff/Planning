@@ -280,3 +280,102 @@ test.describe("notifications", () => {
     expect(toast.x + toast.width).toBeLessThanOrEqual(390);
   });
 });
+
+test.describe("report des tâches non faites", () => {
+  const file = (items) => ({
+    name: "s.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ items })),
+  });
+  const one = (o) => ({ kind: "task", recur: "none", cat: "vert", ...o });
+  const today = (page) => page.locator(".todo.day.today");
+
+  test.beforeEach(async ({ page }) => {
+    await page
+      .locator("#importFile")
+      .setInputFiles(
+        file([
+          one({ title: "Sans heure lundi", start: "2026-09-28" }),
+          one({ title: "Avec heure mardi", start: "2026-09-29", from: "16:00", to: "16:30" }),
+          one({ title: "Trop vieille", start: "2026-09-21" }),
+          one({ title: "Faite lundi", start: "2026-09-28", done: { "2026-09-28": true } }),
+        ]),
+      );
+    await page.getByRole("button", { name: "OK" }).click();
+  });
+
+  test("les tâches ponctuelles non faites arrivent aujourd'hui, sans heure, et comptent", async ({ page }) => {
+    const carried = today(page).locator("li.carried");
+    await expect(carried).toHaveCount(2);
+    await expect(carried.nth(0)).toContainText("Sans heure lundi");
+    await expect(carried.nth(0)).toContainText("depuis lun. 28");
+    await expect(carried.nth(1)).toContainText("Avec heure mardi");
+    await expect(carried.nth(1)).toContainText("depuis mar. 29");
+    await expect(today(page)).not.toContainText("Trop vieille");
+    await expect(today(page)).not.toContainText("Faite lundi");
+    // Une tâche récurrente non cochée la veille n'est pas reportée : elle revient d'elle-même.
+    await expect(carried.filter({ hasText: "Lire 20 pages" })).toHaveCount(0);
+    await expect(page.locator("#bar")).toContainText("Tâches du jour : 0/6");
+    // Elles restent visibles à leur date prévue : dans la grille pour celle qui avait une heure.
+    await expect(page.locator('.col[data-col="2026-09-29"] .ev.task', { hasText: "Avec heure mardi" })).toHaveCount(1);
+    await expect(page.locator(".todo.day.past").first()).toContainText("Sans heure lundi");
+    // Aucune copie dans la grille d'aujourd'hui.
+    await expect(page.locator(".col.day.today")).not.toContainText("Avec heure mardi");
+  });
+
+  test("cocher une tâche reportée la marque faite partout et arrête le report", async ({ page }) => {
+    await today(page).getByRole("checkbox", { name: "Marquer « Sans heure lundi » comme faite" }).click();
+    await expect(page.locator("#bar")).toContainText("Tâches du jour : 1/6");
+    const done = today(page).locator("li.carried.done");
+    await expect(done).toContainText("Sans heure lundi");
+    await expect(done).toContainText("prévue lun. 28");
+    await expect(page.locator(".todo.day.past").first().locator("li.done")).toContainText(["Sans heure lundi"]);
+    await page.reload();
+    await expect(today(page).locator("li.carried.done")).toContainText("Sans heure lundi");
+
+    // Le lendemain : elle n'est plus reportée, mais reste visible le jour où elle a été faite.
+    await page.clock.setFixedTime(new Date("2026-10-01T10:00:00"));
+    await page.reload();
+    await expect(page.locator(".ev").first()).toBeVisible();
+    await expect(today(page)).not.toContainText("Sans heure lundi");
+    await expect(today(page).locator("li.carried")).toContainText(["Avec heure mardi"]);
+    await expect(page.locator(".todo.day.past li.carried.done")).toContainText("Sans heure lundi");
+  });
+
+  test("décocher remet la tâche à faire, où qu'on clique", async ({ page }) => {
+    const box = today(page).getByRole("checkbox", { name: "Marquer « Sans heure lundi » comme faite" });
+    await box.click();
+    await expect(today(page).locator("li.carried.done")).toHaveCount(1);
+    // On la décoche depuis sa date prévue.
+    await page
+      .locator(".todo.day.past")
+      .first()
+      .getByRole("checkbox", { name: "Marquer « Sans heure lundi » comme faite" })
+      .click();
+    await expect(today(page).locator("li.carried.done")).toHaveCount(0);
+    await expect(today(page).locator("li.carried")).toHaveCount(2);
+    await expect(page.locator("#bar")).toContainText("Tâches du jour : 0/6");
+  });
+
+  test("déplacer une tâche faite après report la remet à faire à sa nouvelle date", async ({ page }) => {
+    await today(page).getByRole("checkbox", { name: "Marquer « Sans heure lundi » comme faite" }).click();
+    await today(page).getByRole("button", { name: "Sans heure lundi", exact: true }).click();
+    await page.getByRole("button", { name: "Modifier" }).click();
+    await page.getByLabel("Date (1re fois)").fill("2026-10-02");
+    await page.getByRole("button", { name: "Enregistrer" }).click();
+    const friday = page.locator(".todo.day").nth(4);
+    await expect(friday.locator("li", { hasText: "Sans heure lundi" })).not.toHaveClass(/done/);
+    await expect(today(page)).not.toContainText("Sans heure lundi");
+    await expect(page.locator(".todo.day.past").first()).not.toContainText("Sans heure lundi");
+  });
+
+  test("le détail d'une tâche reportée garde sa date prévue", async ({ page }) => {
+    await today(page).getByRole("button", { name: "Avec heure mardi", exact: true }).click();
+    await expect(page.locator("#detMeta")).toContainText("mardi 29 septembre · 16:00 → 16:30");
+    await expect(page.locator("#detMeta")).toContainText("reportée à aujourd'hui");
+    await page.getByRole("button", { name: "Marquer faite" }).click();
+    await expect(today(page).locator("li.carried.done")).toContainText("Avec heure mardi");
+    await today(page).getByRole("button", { name: "Avec heure mardi", exact: true }).click();
+    await expect(page.locator("#detMeta")).toContainText("Faite le mercredi 30 septembre, après report");
+  });
+});

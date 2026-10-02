@@ -13,13 +13,13 @@ import {
   fromMin,
   DN,
   recurText,
-  isDone,
   occurs,
 } from "./recurrence.js";
 import { CATS, LAST } from "./items.js";
 import { layout } from "./layout.js";
 import { Store } from "./store.js";
-import { state, catLabel, setDayFlag, findItem, todayDate } from "./state.js";
+import { carriedFor, isCarrying, taskDone } from "./carry.js";
+import { state, catLabel, toggleDone, todayDate } from "./state.js";
 import { $, esc, applyGeometry, anyDialogOpen } from "./dom.js";
 import { openDetail } from "./detail.js";
 import { openForm } from "./form.js";
@@ -27,6 +27,8 @@ import { openCats } from "./categories.js";
 import { resetDemo } from "./menu.js";
 
 const fmtShort = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
+/** « mar. 29 » : jour prévu d'une tâche reportée. */
+const fmtFrom = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric" });
 const CHECK =
   '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.2 4.2 7.3 8 2.8" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 /** Plage horaire par défaut, élargie si un élément déborde. */
@@ -47,8 +49,9 @@ const isRecurring = (it) => it.recur && it.recur !== "none";
 /** Barre d'état : avancement des tâches du jour, bandeau de démo. */
 export function renderStatus() {
   const today = ds(new Date());
-  const tasks = occsFor(today).filter((it) => it.kind === "task");
-  const done = tasks.filter((it) => isDone(it, today)).length;
+  // Les tâches reportées à aujourd'hui comptent : elles sont à faire aujourd'hui.
+  const tasks = [...occsFor(today).filter((it) => it.kind === "task"), ...carriedFor(state.items, today, today)];
+  const done = tasks.filter((it) => taskDone(it, today)).length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   let h = "";
   if (!state.loaded) h += `<span class="status">Chargement du planning…</span>`;
@@ -94,7 +97,9 @@ export function render() {
     }
     const when = s === todayS ? "today" : s < todayS ? "past" : "";
     const cls = `${when}${dow(d) >= 5 ? " weekend" : ""}`;
-    return { d, s, when, cls, timed: layout(timed), untimed: occ.filter((it) => !(it.from && it.to)) };
+    const untimed = occ.filter((it) => !(it.from && it.to));
+    // Tâches reportées : toujours sans heure, pour ne rien bloquer dans la grille.
+    return { d, s, when, cls, timed: layout(timed), untimed, carried: carriedFor(state.items, s, todayS) };
   });
   endH = Math.min(endH, 24);
   renderLegend(perDay, days.length);
@@ -113,13 +118,25 @@ export function render() {
   h += `<div class="todo gut"><span>À faire</span></div>`;
   for (const p of perDay) {
     h += `<div class="todo day ${p.cls}"><ul>`;
-    if (!p.untimed.length) h += `<li class="empty">—</li>`;
+    if (!p.untimed.length && !p.carried.length) h += `<li class="empty">—</li>`;
+    for (const it of p.carried) {
+      const dn = taskDone(it, p.s);
+      const from = fmtFrom.format(parse(it.start));
+      h += `<li class="carried${dn ? " done" : ""}${dim(it)}" data-cat="${esc(it.cat || "gris")}">
+        <button class="chk" role="checkbox" aria-checked="${dn}" aria-label="Marquer « ${esc(it.title)} » comme faite, ${dn ? "prévue" : "reportée depuis"} ${esc(from)}" data-toggle="${esc(it.id)}" data-day="${p.s}">${CHECK}</button>
+        <span class="t-body">
+          <button class="t-title" data-open="${esc(it.id)}" data-day="${p.s}">${esc(it.title)}</button>
+          <span class="from">${dn ? "prévue" : "depuis"} ${esc(from)}</span>
+        </span>
+      </li>`;
+    }
     for (const it of p.untimed) {
-      const dn = isDone(it, p.s);
+      const dn = taskDone(it, p.s);
       h += `<li class="${dn ? "done" : ""}${dim(it)}" data-cat="${esc(it.cat || "gris")}">
         <button class="chk" role="checkbox" aria-checked="${dn}" aria-label="Marquer « ${esc(it.title)} » comme faite" data-toggle="${esc(it.id)}" data-day="${p.s}">${CHECK}</button>
         <button class="t-title" data-open="${esc(it.id)}" data-day="${p.s}">${esc(it.title)}</button>
         ${isRecurring(it) ? `<span class="rec" title="${esc(recurText(it))}">↻</span>` : ""}
+        ${isCarrying(it, todayS) ? `<span class="rec" role="img" aria-label="Reportée à aujourd'hui" title="Non faite : reportée à aujourd'hui">↷</span>` : ""}
       </li>`;
     }
     h += `</ul></div>`;
@@ -140,14 +157,15 @@ export function render() {
       const en = Math.max(toMin(e.to), s + 15);
       const top = y(s);
       const ht = Math.max(((en - s) / 60) * HOUR - 2, 20);
-      const dn = e.kind === "task" && isDone(e, p.s);
+      const dn = e.kind === "task" && taskDone(e, p.s);
+      const moved = isCarrying(e, todayS);
       const tip = `${e.title} · ${e.from}–${e.to} · ${catLabel(e.cat)}`;
       h += `<div class="ev ${e.kind === "task" ? "task" : "block"}${ht < 40 ? " short" : ""}${dn ? " done" : ""}${dim(e)}" role="button" tabindex="0"
         data-open="${esc(e.id)}" data-day="${p.s}" data-cat="${esc(e.cat || "bleu")}" title="${esc(tip)}"
         data-top="${top + 1}" data-height="${ht}" data-lane="${e.lane}" data-lanes="${e.lanes || 1}"
-        aria-label="${esc(e.title)}, ${e.from} à ${e.to}">
+        aria-label="${esc(e.title)}, ${e.from} à ${e.to}${moved ? ", reportée à aujourd'hui" : ""}">
         ${e.kind === "task" ? `<button class="chk" role="checkbox" aria-checked="${dn}" aria-label="Marquer comme faite" data-toggle="${esc(e.id)}" data-day="${p.s}">${CHECK}</button>` : ""}
-        <span class="bd"><span class="tt">${esc(e.title)}</span><span class="tm">${e.from}–${e.to}${isRecurring(e) ? " ↻" : ""}</span></span>
+        <span class="bd"><span class="tt">${esc(e.title)}</span><span class="tm">${e.from}–${e.to}${isRecurring(e) ? " ↻" : ""}${moved ? " ↷" : ""}</span></span>
       </div>`;
     }
     h += `</div>`;
@@ -220,8 +238,7 @@ export function initBoard() {
     const t = target.closest("[data-toggle]");
     if (t instanceof HTMLElement) {
       ev.stopPropagation();
-      const it = findItem(t.dataset.toggle);
-      if (it) setDayFlag(it.id, "done", t.dataset.day, !isDone(it, t.dataset.day));
+      toggleDone(t.dataset.toggle, t.dataset.day);
       return;
     }
     const o = target.closest("[data-open]");

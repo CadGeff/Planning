@@ -29,7 +29,7 @@ create table if not exists public.items (
 
 comment on table  public.items         is 'Semainier : créneaux bloqués et tâches, avec leur règle de récurrence.';
 comment on column public.items.days    is 'Récurrence hebdo : jours actifs, 0 = lundi … 6 = dimanche.';
-comment on column public.items.done    is 'Occurrences cochées : { "AAAA-MM-JJ": true }.';
+comment on column public.items.done    is 'Occurrences cochées : { "AAAA-MM-JJ": true }. Tâche ponctuelle : le jour où elle a été faite.';
 comment on column public.items.skipped is 'Occurrences retirées de la série : { "AAAA-MM-JJ": true }.';
 
 create index if not exists items_user_id_idx on public.items (user_id);
