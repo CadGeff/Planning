@@ -2,12 +2,12 @@
 
 Planning personnel en vue semaine, pensé comme une page de cahier : on y **bloque des créneaux** et on y **coche des tâches récurrentes** qui se remettent à zéro chaque jour, chaque semaine ou chaque mois.
 
-[![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-2D47C9)](https://semainier-cadgeff.pages.dev/#demo)
+[![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-D9536A)](https://semainier-cadgeff.pages.dev/#demo)
 [![CI](https://github.com/CadGeff/semainier/actions/workflows/ci.yml/badge.svg)](https://github.com/CadGeff/semainier/actions/workflows/ci.yml)
 [![En-têtes de sécurité : A+](https://img.shields.io/badge/securityheaders.com-A%2B-23946A)](https://securityheaders.com/?q=semainier-cadgeff.pages.dev&followRedirects=on)
 [![JavaScript sans framework](https://img.shields.io/badge/JavaScript-sans%20framework-1B2140)](#stack-technique)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-23946A)](#sécurité)
-[![PWA](https://img.shields.io/badge/PWA-installable-C98712)](#fonctionnalités)
+[![PWA](https://img.shields.io/badge/PWA-installable-D9730D)](#fonctionnalités)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-737A94)](LICENSE)
 
 **[→ Essayer la démo](https://semainier-cadgeff.pages.dev/#demo)**, sans compte, avec des données d'exemple stockées dans votre navigateur.
@@ -27,9 +27,9 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Tâches à cocher**, avec ou sans heure. Les tâches sans heure vont dans la ligne « À faire » du jour.
 - **Récurrence** quotidienne, hebdomadaire (jours au choix) ou mensuelle. Le 31 retombe sur le dernier jour des mois courts.
 - **Report des tâches non faites** : une tâche ponctuelle qui n'a pas été cochée réapparaît le lendemain dans « À faire », sans heure, pendant 7 jours au plus. Elle reste visible à sa date prévue, et la cocher la marque faite partout. Le report est calculé à l'affichage : rien n'est modifié en base tant qu'on ne coche pas.
-- **Cocher ne vaut que pour le jour même** : l'occurrence suivante revient vierge. On peut aussi retirer un seul jour d'une série sans toucher au reste.
+- **Pour une tâche récurrente, cocher ne vaut que pour le jour même** : l'occurrence suivante revient vierge. On peut aussi retirer un seul jour d'une série sans toucher au reste.
 - **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps bloqué par catégorie sur la semaine, et un clic sur une catégorie efface les autres. Les noms sont modifiables et synchronisés entre appareils.
-- **Repères visuels** : jours passés atténués, colonne du jour, ligne de l'heure actuelle, compteur des tâches du jour.
+- **Repères visuels** : jours passés atténués, jour courant encadré, week-end teinté, ligne de l'heure actuelle, compteur des tâches du jour.
 - **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
 - **Notifications** empilées en bas de l'écran, trois au maximum : une confirmation disparaît seule, une erreur ou le résultat d'un import reste jusqu'au clic sur « OK ».
 - **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine, <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
@@ -58,7 +58,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 flowchart LR
     subgraph Navigateur
         UI["Interface<br/>board, form, menu, session…"] --> ST["state.js<br/>état + file d'écritures"]
-        UI --> REC["recurrence.js · layout.js · items.js<br/>fonctions pures"]
+        UI --> REC["recurrence.js · carry.js · layout.js<br/>items.js · backup.js · errors.js<br/>fonctions pures"]
         ST --> STO["store.js<br/>couche de stockage"]
         SW["sw.js<br/>cache hors connexion"]
     end
@@ -69,9 +69,9 @@ flowchart LR
     API --> PG[("Postgres<br/>items, settings + RLS")]
 ```
 
-**Une règle, pas des occurrences.** La base stocke chaque élément une seule fois, avec sa règle de répétition. Les occurrences sont calculées à l'affichage par `recurrence.js`, un module de fonctions pures couvert par des tests. Deux tableaux JSON par élément gardent les exceptions : `done`, pour les jours cochés, et `skipped`, pour les jours retirés de la série.
+**Une règle, pas des occurrences.** La base stocke chaque élément une seule fois, avec sa règle de répétition. Les occurrences sont calculées à l'affichage par `recurrence.js`, et le report des tâches non faites par `carry.js` : deux modules de fonctions pures couverts par des tests. Deux objets JSON par élément gardent les exceptions : `done`, pour les jours cochés, et `skipped`, pour les jours retirés de la série.
 
-**Modules sans effet de bord.** Chaque module d'interface exporte une fonction `init…()` appelée par `app.js` : importer un module ne pose aucun écouteur et ne déclenche aucun rendu, ce qui rend l'ordre de démarrage explicite. La logique métier (récurrence, placement des créneaux, validation des imports, traduction des erreurs) vit dans des modules purs, testés sous Node sans navigateur.
+**Modules sans effet de bord.** Chaque module d'interface exporte une fonction `init…()` appelée par `app.js` : importer un module ne pose aucun écouteur et ne déclenche aucun rendu, ce qui rend l'ordre de démarrage explicite. La logique métier (récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde, traduction des erreurs) vit dans des modules purs, testés sous Node sans navigateur.
 
 **Trois modes, une interface.** `store.js` expose la même interface (`list`, `save`, `remove`…) derrière trois implémentations : Supabase en production, `localStorage` pour la démo publique (`#demo`), et un mode local quand `config.js` est vide. L'interface ne sait pas où vont les données.
 
@@ -79,14 +79,16 @@ flowchart LR
 
 | Colonne | Type | Rôle |
 |---|---|---|
-| `id` | `uuid` | Identifiant généré côté client, pour que l'import et la création soient rejouables sans doublon |
+| `id` | `uuid` | Identifiant généré côté client : une écriture rejouée met à jour la même ligne au lieu d'en créer une seconde |
 | `user_id` | `uuid` | Propriétaire, rempli par défaut avec `auth.uid()` |
+| `title` | `text` | Intitulé, de 1 à 120 caractères |
 | `kind` | `text` | `block` (créneau bloqué) ou `task` (tâche à cocher) |
 | `start_date` | `date` | Première occurrence |
 | `time_from`, `time_to` | `time` | Horaires : les deux ou aucun, et la fin après le début |
 | `recur` | `text` | `none`, `daily`, `weekly` ou `monthly` |
 | `days` | `smallint[]` | Jours actifs en hebdomadaire, de 0 (lundi) à 6 (dimanche) |
-| `done`, `skipped` | `jsonb` | Occurrences cochées ou retirées : `{ "AAAA-MM-JJ": true }` |
+| `cat` | `text` | Catégorie, parmi cinq couleurs |
+| `done`, `skipped` | `jsonb` | Occurrences cochées ou retirées : `{ "AAAA-MM-JJ": true }`. Pour une tâche ponctuelle, `done` retient le jour où elle a été faite |
 
 Une seconde table, `settings`, contient une ligne par utilisateur avec les noms des catégories (`cat_labels`), sous la même RLS. Toutes ces contraintes sont vérifiées par Postgres lui-même (voir [`supabase/schema.sql`](supabase/schema.sql)).
 
@@ -140,7 +142,7 @@ Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est un
 **Risques résiduels, assumés**
 
 - **Appareil déverrouillé** : quiconque tient un téléphone ou un PC ouvert voit le planning. Le verrouillage de l'appareil reste la première ligne de défense.
-- **Jeton en `localStorage`** : un XSS réussi pourrait le lire. La CSP et l'échappement systématique rendent ce scénario très improbable, et le jeton expire au bout d'une heure.
+- **Jetons en `localStorage`** : un XSS réussi pourrait lire le jeton d'accès et le jeton de renouvellement stocké à côté. La CSP et l'échappement systématique rendent ce scénario très improbable. « Se déconnecter » révoque les jetons de renouvellement sur tous les appareils ; un jeton d'accès déjà émis reste valable jusqu'à son expiration, une heure par défaut.
 - **Données en clair côté serveur** : Supabase chiffre le disque, mais un administrateur du projet (ou de Supabase) peut lire les tables. Un chiffrement de bout en bout protégerait de ce cas, au prix de la recherche et de la synchro simple.
 - **Hébergeur** : Cloudflare voit passer les requêtes vers les fichiers du site (adresse IP, date), mais pas les données du planning, qui vont directement du navigateur à Supabase. Son réseau ajoute aussi les en-têtes `NEL` / `Report-To` (impossibles à retirer sur une adresse `pages.dev`) : en cas d'échec de chargement, le navigateur lui envoie un rapport d'erreur réseau, sans contenu de page. Le site ne dépend d'aucune fonctionnalité propre à Cloudflare : il se redéploie ailleurs tel quel.
 - **Chaîne d'approvisionnement** : une compromission du compte GitHub ou Cloudflare permettrait de servir un code modifié. Parade : mots de passe uniques, 2FA sur GitHub, Cloudflare et Supabase, accès de Cloudflare limité à ce seul dépôt. Les dépendances npm ne servent qu'au développement et ne sont jamais déployées ; les actions GitHub sont épinglées par empreinte de commit et le workflow n'a que le droit de lecture.
@@ -246,6 +248,7 @@ tests/unit/               tests node:test
 tests/e2e/                tests Playwright et simulation de Supabase
 tests/server.js           serveur local avec les en-têtes de production
 .github/                  CI et Dependabot
+types/                    déclarations de types pour la vérification JSDoc
 docs/                     captures du README
 ```
 
