@@ -433,6 +433,38 @@ test.describe("bouton retour", () => {
     await stays(page);
   });
 
+  test.describe("sur un téléphone qui ne se déclare pas installé (Firefox pour Android)", () => {
+    test.use({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true });
+
+    test("lancée sans page d'origine : le retour laisse l'application à l'écran", async ({ page }) => {
+      await open(page, { "semainier.view": "month" });
+      expect(await page.evaluate(() => matchMedia("(display-mode: standalone)").matches)).toBe(false);
+      const entry = () => page.evaluate(() => history.state?.semainier ?? null);
+      await page.locator(".brand h1").tap();
+      expect(await entry()).toBe("guard");
+      for (let i = 0; i < 2; i++) {
+        await page.goBack();
+        await expect.poll(entry).toBe("guard");
+        await stays(page);
+      }
+      // La décision tient après un rechargement, quand l'historique n'est plus vide.
+      await page.reload();
+      await page.locator(".brand h1").tap();
+      await page.goBack();
+      await expect.poll(entry).toBe("guard");
+      await stays(page);
+    });
+
+    test("arrivée par un lien depuis un autre site : le retour n'est pas retenu", async ({ page }) => {
+      await page.clock.setFixedTime(NOW);
+      await page.goto("/#demo", { referer: "https://github.com/" });
+      await expect(page.locator("#app")).toBeVisible();
+      expect(await page.evaluate(() => document.referrer)).toBe("https://github.com/");
+      await page.locator(".brand h1").tap();
+      expect(await page.evaluate(() => history.state)).toBe(null);
+    });
+  });
+
   test("onglet de navigateur ordinaire : aucune entrée de garde, le retour n'est pas retenu", async ({ page }) => {
     await open(page);
     const atLoad = await page.evaluate(() => history.length);

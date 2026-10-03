@@ -2,14 +2,18 @@
 // Sans ce module, l'application n'a qu'une seule entrée dans l'historique : un retour quitte
 // la page, et une application installée affiche alors un écran vide. Deux règles :
 //   1. une fenêtre ou le menu sont ouverts : le retour les ferme ;
-//   2. application installée, rien d'ouvert : le retour ne fait rien (on reste dans l'application).
-// Dans un onglet de navigateur ordinaire, la règle 2 ne s'applique pas : le retour ramène
-// à la page précédente, comme partout.
+//   2. application lancée depuis son icône, rien d'ouvert : le retour ne fait rien (on reste
+//      dans l'application).
+// Quand on arrive d'une autre page, la règle 2 ne s'applique pas : le retour y ramène, comme partout.
 //
-// Contrainte des navigateurs : au retour, ils sautent les entrées d'historique sur lesquelles
-// l'utilisateur n'a rien touché (protection contre les pages qui piègent le bouton retour).
-// L'entrée de garde n'est donc posée qu'au premier geste, et on y revient avec forward()
-// au lieu d'en créer une nouvelle : chaque entrée utilisée a bien été touchée.
+// Deux contraintes des navigateurs :
+// - Firefox pour Android ne dit pas à la page qu'elle tourne en application installée
+//   (display-mode y vaut toujours « browser »). On le déduit donc aussi du contexte : écran
+//   tactile et aucune page d'origine.
+// - Au retour, les navigateurs sautent les entrées d'historique sur lesquelles l'utilisateur
+//   n'a rien fait (protection contre les pages qui piègent le bouton retour). L'entrée de garde
+//   n'est donc posée qu'après un premier clic, et on y revient avec forward() au lieu d'en
+//   créer une nouvelle : chaque entrée utilisée a bien servi.
 
 import { closeOpenDialog, anyDialogOpen } from "./dom.js";
 import { closeMenu, isMenuOpen } from "./menu.js";
@@ -17,11 +21,38 @@ import { closeMenu, isMenuOpen } from "./menu.js";
 const OVERLAY = "overlay";
 const GUARD = "guard";
 
-/** Application lancée depuis son icône (installée), et non dans un onglet de navigateur. */
-const installed = () =>
+/** Décision prise au chargement, gardée pour les rechargements de la même session. */
+const GUARDED_KEY = "semainier.guarded";
+
+/** Le navigateur déclare une application installée. */
+const declaredInstalled = () =>
   ["standalone", "fullscreen", "minimal-ui"].some((mode) => matchMedia(`(display-mode: ${mode})`).matches) ||
   /** @type {any} */ (navigator).standalone === true ||
   document.referrer.startsWith("android-app://");
+
+/**
+ * À défaut de déclaration : un téléphone ou une tablette, sans page d'origine. C'est le cas
+ * d'un lancement depuis l'icône (ou d'une adresse tapée, d'un favori) ; ce n'est pas celui
+ * d'un visiteur arrivé par un lien depuis un autre site, à qui le retour reste acquis.
+ * La longueur de l'historique n'est pas un indice fiable : une application installée peut
+ * retrouver au lancement l'historique de sa session précédente.
+ */
+const looksInstalled = () => matchMedia("(pointer: coarse)").matches && document.referrer === "";
+
+function decideGuarded() {
+  try {
+    if (sessionStorage.getItem(GUARDED_KEY) === "1") return true;
+    const yes = declaredInstalled() || looksInstalled();
+    if (yes) sessionStorage.setItem(GUARDED_KEY, "1");
+    return yes;
+  } catch {
+    return declaredInstalled() || looksInstalled();
+  }
+}
+
+/** Le retour doit-il rester dans l'application ? Fixé par initBack(). */
+let guarded = false;
+const installed = () => guarded;
 const somethingOpen = () => anyDialogOpen() || isMenuOpen();
 const current = () => history.state?.semainier;
 
@@ -54,17 +85,19 @@ function reanchor() {
 }
 
 export function initBack() {
+  guarded = decideGuarded();
   // Page rechargée pendant qu'une fenêtre était ouverte : son entrée ne représente plus rien.
   if (current() === OVERLAY) history.replaceState(installed() ? { semainier: GUARD } : null, "");
 
   if (installed()) {
-    // Au premier geste, et pas avant : voir la contrainte décrite en tête de fichier.
+    // Après un premier clic ou une première touche, et pas avant : voir les contraintes en tête
+    // de fichier. Un simple défilement ne compte pas comme une action pour le navigateur.
     const arm = () => {
-      removeEventListener("pointerdown", arm, true);
+      removeEventListener("click", arm, true);
       removeEventListener("keydown", arm, true);
       guard();
     };
-    addEventListener("pointerdown", arm, true);
+    addEventListener("click", arm, true);
     addEventListener("keydown", arm, true);
   }
 
