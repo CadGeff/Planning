@@ -14,8 +14,8 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     locale: "fr-FR",
     timezoneId: "Europe/Paris",
-    // Le service worker est désactivé par défaut : il servirait config.js depuis son cache
-    // et contournerait les simulations. Un test dédié le réactive (offline.spec.js).
+    // Le service worker est désactivé par défaut : les requêtes qu'il émet lui-même échappent
+    // aux simulations de page.route. Un test dédié le réactive (offline.spec.js).
     serviceWorkers: "block",
     trace: "retain-on-failure",
     // Chromium déjà installé ailleurs (ex. conteneur) : PW_CHROMIUM=/chemin/vers/chrome

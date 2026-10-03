@@ -158,7 +158,7 @@ async function importJson(file) {
   const s = fresh.length > 1 ? "s" : "";
   const parts = fresh.length ? [`${fresh.length} élément${s} importé${s}`] : [];
   if (duplicates) parts.push(`${duplicates} déjà présent${duplicates > 1 ? "s" : ""}`);
-  if (read.invalid) parts.push(`${plural(read.invalid, "ignoré")} (invalides)`);
+  if (read.invalid) parts.push(`${read.invalid} invalide${read.invalid > 1 ? "s ignorés" : " ignoré"}`);
   if (labels) parts.push("noms des catégories restaurés");
   const msg = parts.join(", ");
   setStatus(`${msg[0].toUpperCase()}${msg.slice(1)}.`, false, true);

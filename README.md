@@ -23,17 +23,18 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 ## Fonctionnalités
 
 - **Vue semaine** sur une grille au quart d'heure, et **vue jour** sur mobile.
-- **Créneaux bloqués** : un clic sur une case vide crée un créneau à cette heure, avec un aperçu au survol.
+- **Créneaux bloqués** : un clic sur une case vide ouvre le formulaire d'un créneau à cette heure, avec un aperçu au survol et des durées prêtes à choisir.
 - **Tâches à cocher**, avec ou sans heure. Les tâches sans heure vont dans la ligne « À faire » du jour.
 - **Récurrence** quotidienne, hebdomadaire (jours au choix) ou mensuelle. Le 31 retombe sur le dernier jour des mois courts.
 - **Report des tâches non faites** : une tâche ponctuelle qui n'a pas été cochée réapparaît le lendemain dans « À faire », sans heure, pendant 7 jours au plus. Elle reste visible à sa date prévue, et la cocher la marque faite partout. Le report est calculé à l'affichage : rien n'est modifié en base tant qu'on ne coche pas.
 - **Pour une tâche récurrente, cocher ne vaut que pour le jour même** : l'occurrence suivante revient vierge. On peut aussi retirer un seul jour d'une série sans toucher au reste.
-- **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps bloqué par catégorie sur la semaine, et un clic sur une catégorie atténue les autres. Les noms sont modifiables et synchronisés entre appareils.
+- **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps des créneaux bloqués par catégorie, sur la semaine ou sur le jour affiché, et un clic sur une catégorie atténue les autres. Les noms sont modifiables et synchronisés entre appareils.
 - **Repères visuels** : jours passés atténués, jour courant encadré, week-end teinté, ligne de l'heure actuelle, compteur des tâches du jour.
 - **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
 - **Notifications** empilées en bas de l'écran, trois au maximum : une confirmation disparaît seule, une erreur ou le résultat d'un import reste jusqu'au clic sur « OK ».
 - **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine (de jour sur mobile), <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
 - **Sauvegarde et restauration** : l'export JSON contient le planning et les noms des catégories ; l'import n'ajoute que ce qui manque, sans doublon. Le menu rappelle quand la dernière sauvegarde faite depuis cet appareil date de plus de 30 jours.
+- **Compte** : changement du mot de passe depuis le menu (12 caractères minimum).
 - **Double authentification (TOTP) optionnelle**, activable depuis le menu : QR code à scanner avec une application comme Aegis, puis code à 6 chiffres à chaque nouvelle connexion. Elle est imposée par la base de données, pas seulement par l'interface.
 - **Application installable (PWA)** : icône sur l'écran d'accueil. Hors connexion, l'interface s'ouvre ; le planning lui-même demande le réseau, sauf en mode local ou démo.
 
@@ -58,8 +59,9 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 flowchart LR
     subgraph Navigateur
         UI["Interface<br/>board, form, menu, session…"] --> ST["state.js<br/>état + file d'écritures"]
-        UI --> REC["recurrence.js · carry.js · layout.js<br/>items.js · backup.js · errors.js<br/>logique sans DOM"]
+        UI --> REC["recurrence.js · carry.js · layout.js<br/>items.js · backup.js<br/>logique sans DOM"]
         ST --> STO["store.js<br/>couche de stockage"]
+        STO --> ERR["errors.js<br/>traduction des erreurs"]
         SW["sw.js<br/>cache hors connexion"]
     end
     CF["Cloudflare Pages<br/>fichiers statiques + en-têtes"] -->|HTTPS| SW
@@ -73,13 +75,13 @@ flowchart LR
 
 **Démarrage explicite.** Les modules d'interface qui posent des écouteurs exportent une fonction `init…()` appelée par `app.js` : les importer ne pose aucun écouteur et ne déclenche aucun rendu, ce qui rend l'ordre de démarrage explicite. Seule exception, `store.js` choisit le mode de stockage et crée le client Supabase dès son import. La logique métier (récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde, traduction des erreurs) vit dans des modules sans accès au DOM, testés sous Node sans navigateur.
 
-**Trois modes, une interface.** `store.js` expose la même interface (`list`, `save`, `remove`…) derrière trois implémentations : Supabase en production, `localStorage` pour la démo publique (`#demo`), et un mode local quand `config.js` est vide. L'interface ne sait pas où vont les données.
+**Trois modes, une interface.** `store.js` expose les mêmes méthodes (`list`, `save`, `remove`…) dans trois modes : Supabase en production, `localStorage` pour la démo publique (`#demo`), et un mode local quand `config.js` est vide. Il y a deux implémentations, Supabase et `localStorage` ; lectures et écritures passent par les mêmes appels quel que soit le mode. L'interface ne consulte le mode que pour adapter ce qui en dépend : menu du compte, bandeau de la démo, données d'exemple, rappel de sauvegarde, resynchronisation.
 
 ### Modèle de données
 
 | Colonne | Type | Rôle |
 |---|---|---|
-| `id` | `uuid` | Identifiant généré côté client : une écriture rejouée met à jour la même ligne au lieu d'en créer une seconde |
+| `id` | `uuid` | Identifiant généré côté client : création et modification passent par le même `upsert` |
 | `user_id` | `uuid` | Propriétaire, rempli par défaut avec `auth.uid()` |
 | `title` | `text` | Intitulé, de 1 à 120 caractères |
 | `kind` | `text` | `block` (créneau bloqué) ou `task` (tâche à cocher) |
@@ -89,8 +91,9 @@ flowchart LR
 | `days` | `smallint[]` | Jours actifs en hebdomadaire, de 0 (lundi) à 6 (dimanche) |
 | `cat` | `text` | Catégorie, parmi cinq couleurs |
 | `done`, `skipped` | `jsonb` | Occurrences cochées ou retirées : `{ "AAAA-MM-JJ": true }`. Pour une tâche ponctuelle, `done` retient le jour où elle a été faite |
+| `created_at`, `updated_at` | `timestamptz` | Dates de création (ordre d'affichage) et de dernière modification, posées par la base |
 
-Une seconde table, `settings`, contient une ligne par utilisateur avec les noms des catégories (`cat_labels`), sous la même RLS. Ces contraintes (valeurs autorisées, longueurs, cohérence des horaires) sont vérifiées par Postgres lui-même (voir [`supabase/schema.sql`](supabase/schema.sql)). Pour les colonnes JSON, la base vérifie seulement qu'il s'agit d'un objet : le détail de leur contenu est validé par l'application.
+Une seconde table, `settings`, contient une ligne par utilisateur avec les noms des catégories (`cat_labels`), sous la même RLS. Les contraintes du tableau (valeurs autorisées, longueurs, cohérence des horaires, heure obligatoire pour un créneau) sont vérifiées par Postgres lui-même (voir [`supabase/schema.sql`](supabase/schema.sql)). Pour les colonnes JSON, la base vérifie seulement qu'il s'agit d'un objet, et pour `cat_labels` qu'il reste sous 4 ko : le détail de leur contenu est validé par l'application.
 
 ## Sécurité
 
@@ -103,7 +106,7 @@ Le dépôt est public et la clé Supabase est visible dans le navigateur, comme 
 - **En-têtes HTTP** (`_headers`) : HSTS, `frame-ancestors 'none'` et `X-Frame-Options` contre le clickjacking (doublés d'une vérification en JavaScript), `nosniff`, `Permissions-Policy` qui coupe caméra, micro, géolocalisation et paiement, isolation `Cross-Origin-Opener-Policy` / `Cross-Origin-Resource-Policy`. L'en-tête CORS ouvert qu'ajoute Cloudflare par défaut est retiré.
 - **Double authentification optionnelle, vérifiée côté serveur** : quand un facteur TOTP est actif, une politique RLS *restrictive* exige un jeton de niveau `aal2` sur `items` et `settings`. Un mot de passe volé donne une session `aal1`, qui ne lit ni n'écrit rien, même en appelant l'API directement. La fonction de contrôle vit dans un schéma `private` non exposé par l'API.
 - **Sessions** : changer de mot de passe ou activer la 2FA révoque les autres sessions ; « Se déconnecter » ferme la session sur tous les appareils. Si le serveur ne confirme pas la révocation, l'application le signale au lieu d'annoncer un succès.
-- **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, type objet des colonnes JSON.
+- **Contraintes SQL** sur les colonnes saisies : énumérations, cohérence des horaires, longueur des titres, type objet des colonnes JSON.
 - **Entrées non fiables** : les imports JSON sont limités à 2 Mo et revalidés champ par champ, et tout le texte affiché est échappé.
 - **Pas de tiers** : ni CDN, ni polices distantes, ni outil d'analyse d'audience. En-tête `no-referrer`.
 - **Vérifié automatiquement**, à chaque exécution de la CI. Côté base, `schema.sql` est appliqué à un Postgres embarqué puis attaqué rôle par rôle : visiteur non connecté, autre utilisateur, session sans code quand la 2FA est active, valeurs hors contraintes. Côté navigateur, les tests de bout en bout contrôlent les en-têtes, l'absence de violation de CSP, le blocage d'un script ou d'un style injecté, le refus d'affichage dans un cadre, l'échappement des titres et le parcours 2FA.
@@ -133,7 +136,7 @@ Un planning semble anodin, mais il décrit **où l'on est et quand** : horaires 
 | Page affichée dans un cadre piégé (clickjacking) | `frame-ancestors 'none'` et `X-Frame-Options: DENY` ; refus en JavaScript en secours. |
 | Bibliothèque compromise sur un CDN | Aucun CDN : `supabase-js` et les polices sont versionnés dans le dépôt. |
 | Perte des données (table vidée, projet supprimé par erreur) | Export JSON à la demande, rappel au bout de 30 jours, restauration sans doublon. Pas de sauvegarde automatique : elle obligerait à confier une clé `service_role` à un robot, ce qui contournerait RLS et la 2FA. |
-| Clé secrète commitée par erreur | L'application refuse de se connecter à Supabase avec une clé `service_role` / `sb_secret_` et affiche l'erreur, et GitHub bloque le push des secrets connus. La clé resterait à régénérer : elle serait déjà publique. |
+| Clé secrète publiée par erreur dans le dépôt | L'application refuse de se connecter à Supabase avec une clé `service_role` / `sb_secret_` et affiche l'erreur, et GitHub bloque le push des secrets connus. La clé resterait à régénérer : elle serait déjà publique. |
 
 **Pourquoi la 2FA est optionnelle**
 
@@ -143,7 +146,7 @@ Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est un
 
 - **Appareil déverrouillé** : quiconque tient un téléphone ou un PC ouvert voit le planning. Le verrouillage de l'appareil reste la première ligne de défense.
 - **Jetons en `localStorage`** : un XSS réussi pourrait lire le jeton d'accès et le jeton de renouvellement stocké à côté. La CSP et l'échappement systématique rendent ce scénario très improbable. « Se déconnecter » révoque les jetons de renouvellement sur tous les appareils ; un jeton d'accès déjà émis reste valable jusqu'à son expiration, une heure par défaut.
-- **Données en clair côté serveur** : Supabase chiffre le disque, mais un administrateur du projet (ou de Supabase) peut lire les tables. Un chiffrement de bout en bout protégerait de ce cas, au prix de la recherche et de la synchro simple.
+- **Données en clair côté serveur** : Supabase chiffre le disque, mais un administrateur du projet (ou de Supabase) peut lire les tables. Un chiffrement de bout en bout protégerait de ce cas, au prix d'une clé à gérer sur chaque appareil : la perdre, ce serait perdre le planning.
 - **Hébergeur** : Cloudflare voit passer les requêtes vers les fichiers du site (adresse IP, date), mais l'hébergement du site ne voit pas les données du planning, qui vont directement du navigateur à l'API Supabase. Son réseau ajoute aussi les en-têtes `NEL` / `Report-To` (impossibles à retirer sur une adresse `pages.dev`) : en cas d'échec de chargement, le navigateur lui envoie un rapport d'erreur réseau, sans contenu de page. Le site ne dépend d'aucune fonctionnalité propre à Cloudflare : il se redéploie ailleurs tel quel.
 - **Chaîne d'approvisionnement** : une compromission du compte GitHub ou Cloudflare permettrait de servir un code modifié. Parade : mots de passe uniques, 2FA sur GitHub, Cloudflare et Supabase, accès de Cloudflare limité à ce seul dépôt. Les dépendances npm ne servent qu'au développement et ne sont jamais déployées ; les actions GitHub sont épinglées par empreinte de commit et le workflow n'a que le droit de lecture.
 
@@ -178,15 +181,15 @@ Sur [Cloudflare](https://dash.cloudflare.com), **Workers & Pages → Create appl
 | Build output directory | `public` |
 | Variable d'environnement | `SKIP_DEPENDENCY_INSTALL` = `1` (les dépendances npm ne servent qu'aux tests) |
 
-Chaque push sur `main` redéploie le site, servi à `https://<projet>.pages.dev`. Seul le dossier `public/` est publié ; `public/_headers` y est appliqué automatiquement.
+Chaque push sur `main` redéploie le site, servi à l'adresse `https://<projet>.pages.dev`. Seul le dossier `public/` est publié ; `public/_headers` y est appliqué automatiquement.
 
-Pour votre propre instance, remplacez l'adresse du projet Supabase dans la directive `connect-src` de la CSP, à deux endroits : `public/index.html` et `public/_headers` (un test vérifie qu'ils restent identiques). Puis, dans Supabase, **Authentication → URL Configuration**, renseignez l'adresse du site.
+Remplacer ensuite l'adresse du projet Supabase dans la directive `connect-src` de la CSP, à deux endroits : `public/index.html` et `public/_headers` (un test vérifie qu'ils restent identiques). Pour lancer les tests de bout en bout, la remplacer aussi dans `tests/e2e/fixtures.js`. Puis, dans Supabase, **Authentication → URL Configuration**, renseigner l'adresse du site.
 
-N'importe quel hébergeur de fichiers statiques convient (Netlify, nginx…) : il suffit de servir `public/`. Sans prise en charge de `_headers`, la CSP de `index.html` et la protection anti-cadre en JavaScript restent actives, mais les autres en-têtes sont perdus.
+N'importe quel hébergeur de fichiers statiques convient (Netlify, nginx…) : il suffit de servir `public/`. Sans prise en charge de `_headers`, la CSP de `index.html`, la consigne `no-referrer` et la protection anti-cadre en JavaScript restent actives, mais les autres en-têtes sont perdus.
 
 ## Développement
 
-L'application elle-même n'a besoin d'aucune installation : les fichiers de `public/` sont servis tels quels. Avec un `config.js` vide, elle tourne en mode local. L'outillage demande Node 22 ou plus :
+L'application elle-même n'a besoin d'aucune installation : les fichiers de `public/` sont servis tels quels. Avec un `config.js` vide, elle tourne en mode local, avec des données d'exemple au premier lancement. L'outillage demande Node 22 ou plus :
 
 ```
 npm install                     # outils de développement (une fois)
@@ -203,7 +206,7 @@ Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHEL
 1. `npm run check` et `npm run test:e2e` passent, et la CI est verte.
 2. Relire ce README phrase par phrase contre le code : fonctionnalités, sécurité, modèle de menace, modèle de données. Un test vérifie la section « Structure », les liens et les versions annoncées, mais pas le fond des phrases.
 3. Refaire les captures de `docs/` si l'interface a changé.
-4. Mettre à jour la version dans `package.json`, poser le tag, publier la release.
+4. Mettre à jour la version dans `package.json` et `package-lock.json` (`npm version --no-git-tag-version`), poser le tag, publier la release.
 
 ## Qualité et tests
 
@@ -265,7 +268,7 @@ docs/                     captures du README
 
 - [ ] Vue mois
 - [ ] Glisser-déposer et redimensionner les créneaux à la souris
-- [ ] Synchronisation instantanée entre appareils (aujourd'hui : à chaque retour sur l'onglet)
+- [ ] Synchronisation instantanée entre appareils (aujourd'hui : à chaque retour sur l'onglet ou du réseau)
 - [ ] Statistiques dans la durée : temps bloqué par catégorie au fil des semaines, taux de réalisation et séries des tâches récurrentes
 
 ## Comment ce projet a été réalisé
@@ -275,7 +278,7 @@ Le Semainier a été développé avec Claude (Anthropic), utilisé comme binôme
 - **Mon rôle** : définir le besoin et les fonctionnalités, fixer le niveau d'exigence (le projet est parti d'un simple planning personnel ; c'est moi qui ai demandé d'en faire une application sécurisée de bout en bout et un projet de portfolio), arbitrer les choix d'architecture et de sécurité (Supabase et RLS, 2FA imposée par la base, hébergement avec en-têtes HTTP, modèle de menace), tester chaque livraison en conditions réelles et en vérifier le résultat, vérifier les affirmations de l'IA sur l'infrastructure réelle et faire corriger ses erreurs, déployer et administrer l'infrastructure (Supabase, Cloudflare, GitHub) et sécuriser les comptes associés.
 - **Le rôle de Claude** : écrire le code, les tests et la documentation, proposer des options et en expliquer les compromis.
 
-Tout le code passe par les mêmes garde-fous : lint, typage, tests unitaires et de bout en bout à chaque push sur `main`.
+Tout le code passe par les mêmes garde-fous à chaque push sur `main` : lint, format, typage du code de l'application, tests unitaires, tests de la base et tests de bout en bout.
 
 ## Licence
 

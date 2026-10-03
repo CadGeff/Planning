@@ -168,7 +168,10 @@ async function startEnroll() {
   });
   mfaRender(
     [
-      el("p", {}, [el("b", { text: "1. " }), "Dans Aegis, appuie sur + puis « Scanner un code QR »."]),
+      el("p", {}, [
+        el("b", { text: "1. " }),
+        "Dans ton application d'authentification (Aegis, par exemple), ajoute un compte en scannant ce QR code.",
+      ]),
       qr,
       el("p", { text: "Pas de caméra ? Saisis cette clé à la main :" }),
       el("div", { class: "mfa-secret", text: en.secret }),

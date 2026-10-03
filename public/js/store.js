@@ -1,8 +1,9 @@
-// Semainier — couche de stockage. Trois implémentations derrière la même interface :
+// Semainier — couche de stockage. Trois modes derrière la même interface :
 //   "supabase" : Postgres + Auth (production)
 //   "demo"     : localStorage, avec l'URL #demo (démo publique, aucun appel réseau)
 //   "local"    : localStorage, quand config.js est vide
-// L'interface ne sait jamais où vont les données.
+// Deux implémentations : Supabase, et localStorage pour la démo comme pour le mode local.
+// Lectures et écritures passent par les mêmes méthodes, quel que soit le mode.
 
 import { toFrench, isMissingTable } from "./errors.js";
 
@@ -17,8 +18,8 @@ import { toFrench, isMissingTable } from "./errors.js";
 
 const cfg = window.SEMAINIER_CONFIG || {};
 
-/** Refuse une clé à privilèges (secret / service_role) mise par erreur dans config.js. */
-export function isPrivilegedKey(key) {
+/** Détecte une clé à privilèges (secret / service_role) mise par erreur dans config.js. */
+function isPrivilegedKey(key) {
   if (/^sb_secret_/.test(key)) return true;
   const parts = key.split(".");
   if (parts.length !== 3) return false;
@@ -179,8 +180,8 @@ function makeSupabaseStore() {
     },
     /**
      * Portée « global » : la déconnexion ferme la session sur tous les appareils.
-     * Cet appareil est déconnecté dans tous les cas ; si le serveur n'a pas répondu,
-     * les autres ne le sont pas.
+     * Si le serveur ne confirme pas, cet appareil est quand même déconnecté (sauf session
+     * illisible), mais les autres ne le sont pas.
      * @returns {Promise<boolean>} false si les autres appareils n'ont pas pu être déconnectés
      */
     async signOut() {

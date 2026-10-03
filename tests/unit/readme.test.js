@@ -44,6 +44,7 @@ test("README : les dossiers et fichiers de la section Structure existent", () =>
     "public/icons",
     "supabase/schema.sql",
     "tests/unit",
+    "tests/db",
     "tests/e2e",
     "tests/server.js",
     ".github",

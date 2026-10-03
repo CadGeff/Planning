@@ -100,10 +100,12 @@ async function enterApp(opts = {}) {
 }
 
 export async function signOut() {
-  const everywhere = await Store.signOut();
-  if (!everywhere)
+  if (await Store.signOut()) return;
+  // `state.email` est vidé quand la session locale est fermée (voir onSignedOut).
+  if (state.email) setStatus("La déconnexion a échoué. Réessaie.", true);
+  else
     setStatus(
-      "Déconnecté sur cet appareil seulement : le serveur n'a pas répondu. Pour fermer les autres sessions, reconnecte-toi puis déconnecte-toi à nouveau.",
+      "Déconnecté sur cet appareil seulement : le serveur n'a pas confirmé. Pour fermer les autres sessions, reconnecte-toi puis déconnecte-toi à nouveau.",
       true,
     );
 }
@@ -165,7 +167,7 @@ export function initSession() {
   $("loginForm").addEventListener("submit", submitLogin);
   $("codeForm").addEventListener("submit", submitCode);
   $("codeCancel").onclick = async () => {
-    await Store.signOut();
+    await signOut();
     showLogin();
   };
   Store.onSignedOut(() => {
@@ -201,7 +203,7 @@ export async function boot() {
     if (await codeRequired()) return;
     checked = true;
   } catch {
-    /* hors ligne : on ouvre quand même l'interface ; le chargement signalera l'erreur */
+    /* hors connexion : on ouvre quand même l'interface ; le chargement signalera l'erreur */
   }
   await enterApp({ mfaChecked: checked });
   if (configError) setStatus(configError, true);

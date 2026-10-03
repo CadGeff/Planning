@@ -3,7 +3,7 @@ import { test as base, expect } from "@playwright/test";
 
 export const SUPABASE = "https://igyoyutosvkbeeiriwyf.supabase.co";
 export const USER_ID = "11111111-1111-1111-1111-111111111111";
-export const EMAIL = "geoffrey@example.fr";
+export const EMAIL = "utilisateur@example.com";
 export const PASSWORD = "mot-de-passe-de-test";
 export const TOTP = "123456";
 

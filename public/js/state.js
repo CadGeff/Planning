@@ -1,6 +1,6 @@
 // État de l'application et écritures vers le stockage.
 // Les modules d'interface lisent `state` et appellent les actions ; l'affichage est
-// rafraîchi par `render()`, branché au démarrage (évite les dépendances circulaires).
+// rafraîchi par `render()`, branché au démarrage : ce module n'importe aucun module d'interface.
 
 import { Store } from "./store.js";
 import { DEFAULT_LABELS } from "./items.js";
@@ -18,7 +18,7 @@ export const state = {
   /** @type {Item[]} */
   items: [],
   loaded: false,
-  /** Le planning a été lu au moins une fois : `items` reflète le stockage (faux après un chargement en échec). */
+  /** Le planning a été lu au moins une fois : `items` reflète le stockage (reste faux tant qu'aucun chargement n'a réussi). */
   hasData: false,
   /** @type {string|null} */
   email: null,
@@ -59,7 +59,7 @@ export const render = () => renderFn();
  */
 
 /** Nombre maximal de notifications à l'écran : au-delà, la plus ancienne laisse sa place. */
-export const MAX_TOASTS = 3;
+const MAX_TOASTS = 3;
 let toastId = 0;
 
 /**

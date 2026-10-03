@@ -133,7 +133,7 @@
 
     <!-- Formulaire création / modification -->
     <div class="scrim" id="formScrim" hidden>
-      <form class="sheet" id="form" novalidate>
+      <form class="sheet" id="form" role="dialog" aria-modal="true" aria-labelledby="formTitle" novalidate>
         <h2 id="formTitle">Nouvel élément</h2>
         <div class="field">
           <label for="f-title">Intitulé</label>
@@ -191,7 +191,7 @@
         </div>
         <p class="err" id="formErr" hidden></p>
         <div class="actions">
-          <button type="button" class="btn danger spacer" id="f-delete" hidden>Supprimer la série</button>
+          <button type="button" class="btn danger spacer" id="f-delete" hidden>Supprimer</button>
           <button type="button" class="btn" id="f-cancel">Annuler</button>
           <button type="submit" class="btn primary">Enregistrer</button>
         </div>
@@ -202,7 +202,7 @@
     <div class="scrim" id="detScrim" hidden>
       <div class="sheet" id="det" role="dialog" aria-modal="true" aria-labelledby="detTitle">
         <div class="detail-head">
-          <span class="dot" id="detDot"></span>
+          <span class="dot"></span>
           <h2 id="detTitle"></h2>
         </div>
         <div class="meta" id="detMeta"></div>
@@ -217,8 +217,8 @@
 
     <!-- Noms des catégories -->
     <div class="scrim" id="catScrim" hidden>
-      <form class="sheet" id="catForm" novalidate>
-        <h2>Catégories</h2>
+      <form class="sheet" id="catForm" role="dialog" aria-modal="true" aria-labelledby="catTitle" novalidate>
+        <h2 id="catTitle">Catégories</h2>
         <p class="hint">
           Donne un nom à chaque couleur. Il apparaît dans la légende, le formulaire et le détail de chaque élément.
         </p>
@@ -234,8 +234,8 @@
 
     <!-- Changement du mot de passe (mode Supabase) -->
     <div class="scrim" id="pwScrim" hidden>
-      <form class="sheet" id="pwForm" novalidate>
-        <h2>Changer le mot de passe</h2>
+      <form class="sheet" id="pwForm" role="dialog" aria-modal="true" aria-labelledby="pwTitle" novalidate>
+        <h2 id="pwTitle">Changer le mot de passe</h2>
         <p class="hint">Astuce : génère-le avec ton gestionnaire de mots de passe et enregistre-le avant de valider.</p>
         <input type="email" id="pw-user" autocomplete="username" hidden />
         <div class="field">

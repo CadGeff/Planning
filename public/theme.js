@@ -2,8 +2,8 @@
    La CSP interdit les scripts en ligne, d'où ce fichier séparé. */
 (function () {
   "use strict";
-  // Anti-clickjacking, en secours de l'en-tête frame-ancestors (absent en local ou chez un
-  // hébergeur sans _headers) : dans un cadre d'un autre site, la page se masque et tente d'en sortir.
+  // Anti-clickjacking, en secours de l'en-tête frame-ancestors (absent chez un hébergeur
+  // qui n'applique pas _headers) : dans un cadre d'un autre site, la page se masque et tente d'en sortir.
   if (window.self !== window.top) {
     document.documentElement.style.display = "none";
     try {

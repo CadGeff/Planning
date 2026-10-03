@@ -1,5 +1,6 @@
-# Intégration continue : à chaque push et pull request, le code est vérifié (lint, format,
-# types), puis testé (tests unitaires, puis tests de bout en bout dans Chromium).
+# Intégration continue : à chaque push sur main et à chaque pull request, deux jobs en parallèle.
+# L'un vérifie le code (lint, format, types) et lance les tests unitaires et de la base ;
+# l'autre lance les tests de bout en bout dans Chromium.
 name: CI
 
 on:
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Lint, format, types, tests unitaires
+    name: Lint, format, types, tests unitaires et de la base
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

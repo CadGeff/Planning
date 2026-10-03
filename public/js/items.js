@@ -28,8 +28,8 @@ export const DEFAULT_LABELS = {
   rose: "Rendez-vous",
   gris: "Perso",
 };
-export const KINDS = ["block", "task"];
-export const RECURS = ["none", "daily", "weekly", "monthly"];
+const KINDS = ["block", "task"];
+const RECURS = ["none", "daily", "weekly", "monthly"];
 /** Dernière minute de la journée (23:59). */
 export const LAST = 23 * 60 + 59;
 export const TITLE_MAX = 120;

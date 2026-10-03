@@ -47,7 +47,7 @@ const isRecurring = (it) => it.recur && it.recur !== "none";
 
 // ------------------------------------------------------------------ Rendu
 /** Barre d'état : avancement des tâches du jour, bandeau de démo. */
-export function renderStatus() {
+function renderStatus() {
   const today = ds(new Date());
   // Les tâches reportées à aujourd'hui comptent : elles sont à faire aujourd'hui.
   const tasks = [...occsFor(today).filter((it) => it.kind === "task"), ...carriedFor(state.items, today, today)];
@@ -184,13 +184,14 @@ function renderLegend(perDay, nDays) {
   const fmtH = (m) => {
     const h = Math.floor(m / 60);
     const r = m % 60;
+    if (!h) return `${r} min`;
     return r ? `${h} h ${pad(r)}` : `${h} h`;
   };
   const period = nDays === 1 ? "ce jour" : "cette semaine";
   $("legend").innerHTML = `${CATS.map(
     (c) => `
       <button class="cat-item" data-cat="${c}" aria-pressed="${state.focusCat === c}"
-        title="${esc(catLabel(c))} : ${mins[c] ? `${fmtH(mins[c])} bloquées ${period}` : `aucun créneau ${period}`}">
+        title="${esc(catLabel(c))} : ${mins[c] ? `${fmtH(mins[c])} de créneaux ${period}` : `aucun créneau ${period}`}">
         <span class="swatch" aria-hidden="true"></span><b>${esc(catLabel(c))}</b>${mins[c] ? `<span class="hrs">${fmtH(mins[c])}</span>` : ""}
       </button>`,
   ).join("")}<button class="linkbtn" id="renameCats">Renommer</button>`;
@@ -295,9 +296,7 @@ export function initBoard() {
   $("next").onclick = goNext;
   $("today").onclick = goToday;
   $("add").onclick = newItem;
-  // addListener : Safari antérieur à 14 ne connaît pas addEventListener sur MediaQueryList.
-  if (narrowMq.addEventListener) narrowMq.addEventListener("change", () => render());
-  else narrowMq.addListener(() => render());
+  narrowMq.addEventListener("change", () => render());
   // Toutes les minutes : ligne de l'heure et passage à minuit, sauf si une fenêtre est ouverte.
   setInterval(() => {
     if (state.loaded && !anyDialogOpen()) render();

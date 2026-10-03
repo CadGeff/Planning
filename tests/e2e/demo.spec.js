@@ -64,6 +64,39 @@ test("un titre contenant du HTML est affiché comme du texte", async ({ page }) 
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
 });
 
+test("formulaire : « Supprimer la série » pour une série, « Supprimer » pour un élément ponctuel", async ({ page }) => {
+  const del = page.locator("#f-delete");
+  await page.locator(`.col.day[data-col="${TODAY}"] .ev`, { hasText: "Deep work" }).click();
+  await page.getByRole("button", { name: "Modifier" }).click();
+  await expect(del).toHaveText("Supprimer la série");
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Ajouter un élément" }).click();
+  await page.getByLabel("Intitulé").fill("Rendez-vous ponctuel");
+  await page.getByText("Créneau bloqué", { exact: true }).click();
+  await page.getByLabel("Date (1re fois)").fill(TODAY);
+  await page.getByLabel("Début").fill("14:00");
+  await page.getByLabel("Fin").fill("15:00");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await page.locator(".ev", { hasText: "Rendez-vous ponctuel" }).click();
+  await page.getByRole("button", { name: "Modifier" }).click();
+  await expect(del).toHaveText("Supprimer");
+});
+
+test("légende : une durée de moins d'une heure s'affiche en minutes", async ({ page }) => {
+  await page.getByRole("button", { name: "Ajouter un élément" }).click();
+  await page.getByLabel("Intitulé").fill("Point rapide");
+  await page.getByText("Créneau bloqué", { exact: true }).click();
+  await page.getByLabel("Date (1re fois)").fill(TODAY);
+  await page.getByLabel("Début").fill("16:00");
+  await page.getByLabel("Fin").fill("16:30");
+  await page.locator('#f-cats label[data-cat="ambre"]').click();
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  const admin = page.locator('#legend .cat-item[data-cat="ambre"]');
+  await expect(admin.locator(".hrs")).toHaveText("30 min");
+  await expect(admin).toHaveAttribute("title", "Admin : 30 min de créneaux cette semaine");
+});
+
 test("détail d'une occurrence : retirer un seul jour d'une série", async ({ page }) => {
   const deep = page.locator(`.col.day[data-col="${TODAY}"] .ev`, { hasText: "Deep work" });
   await deep.click();
@@ -105,7 +138,7 @@ test("import : rejette un fichier invalide, filtre les éléments incorrects", a
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(data)),
   });
-  await expect(page.locator(".toast").last()).toContainText("1 élément importé, 1 ignoré (invalides).");
+  await expect(page.locator(".toast").last()).toContainText("1 élément importé, 1 invalide ignoré.");
   await expect(page.locator(".todo.day.today")).toContainText("Importé");
 });
 
@@ -206,7 +239,7 @@ test.describe("notifications", () => {
     const toast = page.locator(".toast").last();
     await expect(page.locator(".toast-msg").last()).toHaveText("Catégories enregistrées.");
     await expect(page.locator(".toast button").last()).toBeHidden();
-    // La barre du haut ne porte plus les messages.
+    // Les messages ne s'affichent pas dans la barre du haut.
     await expect(page.locator("#bar")).not.toContainText("Catégories enregistrées.");
     const box = await toast.boundingBox();
     expect(box.y).toBeGreaterThan(page.viewportSize().height / 2);

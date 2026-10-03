@@ -1,6 +1,6 @@
 // Report des tâches ponctuelles non faites : fonctions pures, sans DOM ni réseau.
 // Rien n'est écrit tant que la tâche n'est pas cochée : le report se calcule à l'affichage,
-// à partir de la date de l'appareil, et reste donc identique sur tous les appareils.
+// à partir de la date du jour. Il n'y a donc aucun état de report à synchroniser entre appareils.
 
 import { ds, parse, addDays, isDone } from "./recurrence.js";
 

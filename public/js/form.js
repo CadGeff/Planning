@@ -61,14 +61,14 @@ export function openForm(it, pre = {}) {
   buildCatOptions();
   field(`f-cat-${it?.cat || state.focusCat || (kind === "block" ? "bleu" : "ambre")}`).checked = true;
   $("f-delete").hidden = !it;
-  disarm($("f-delete"), "Supprimer la série");
+  disarm($("f-delete"), it && it.recur && it.recur !== "none" ? "Supprimer la série" : "Supprimer");
   $("formErr").hidden = true;
   syncForm();
   $("formScrim").hidden = false;
   focusSoon(field("f-title"));
 }
 
-export function closeForm() {
+function closeForm() {
   $("formScrim").hidden = true;
   editing = null;
 }

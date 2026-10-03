@@ -163,7 +163,7 @@ test("session conservée au rechargement", async ({ page }) => {
   await expect(page.locator("#login")).toBeHidden();
 });
 
-test("déconnexion sans réponse du serveur : cet appareil seulement, et le message le dit", async ({ page }) => {
+test("déconnexion non confirmée par le serveur : cet appareil seulement, et le message le dit", async ({ page }) => {
   await mockSupabase(page, { fail: { logout: 1 } });
   await login(page);
   await expect(page.locator("#app")).toBeVisible();

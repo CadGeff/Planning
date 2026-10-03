@@ -24,7 +24,7 @@ export function openCats() {
   focusSoon(field("c-bleu"));
 }
 
-export function closeCats() {
+function closeCats() {
   $("catScrim").hidden = true;
 }
 

@@ -45,7 +45,7 @@ export function openDetail(id, day) {
   focusSoon($("d-edit"));
 }
 
-export function closeDetail() {
+function closeDetail() {
   $("detScrim").hidden = true;
   cur = null;
 }

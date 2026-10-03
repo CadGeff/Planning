@@ -28,8 +28,10 @@ const BY_CODE = {
   42501: "Accès refusé par la base de données.",
 };
 
-/** Repli sur le texte du message pour les erreurs sans code (réseau, anciennes versions). */
-/** @type {Array<[RegExp, string]>} */
+/**
+ * Repli sur le texte du message pour les erreurs sans code (réseau, anciennes versions).
+ * @type {Array<[RegExp, string]>}
+ */
 const BY_MESSAGE = [
   [/failed to fetch|network|load failed/i, "Impossible de joindre le serveur. Vérifie ta connexion."],
   [/invalid login credentials/i, BY_CODE.invalid_credentials],
