@@ -1,13 +1,13 @@
 // Formulaire de création / modification d'un élément.
 
-import { ds, parse, dow, mondayOf, toMin, fromMin, DN, DL } from "./recurrence.js";
+import { ds, parse, dow, toMin, fromMin, DN, DL } from "./recurrence.js";
 import { CATS, LAST } from "./items.js";
 import { doneAfterEdit } from "./carry.js";
 import { newId } from "./ids.js";
 import { state, catLabel, putItem, removeItem } from "./state.js";
 import { $, field, esc, arm, disarm, isArmed, focusSoon, registerDialog } from "./dom.js";
 import { closeMenu } from "./menu.js";
-import { narrow } from "./board.js";
+import { isShown } from "./board.js";
 
 /** @import { Item } from "./items.js" */
 
@@ -112,8 +112,8 @@ function submit(e) {
   else delete it.days;
   if (editing) it.done = doneAfterEdit(editing, it);
   closeForm();
-  // Un nouvel élément posé sur une autre semaine : on y va, pour le voir apparaître.
-  if (wasNew && !narrow() && ds(mondayOf(parse(start))) !== ds(mondayOf(state.sel))) state.sel = parse(start);
+  // Un nouvel élément posé hors de la période affichée : on y va, pour le voir apparaître.
+  if (wasNew && !isShown(start)) state.sel = parse(start);
   putItem(it);
 }
 

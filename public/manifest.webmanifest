@@ -1,7 +1,7 @@
 {
   "name": "Semainier",
   "short_name": "Semainier",
-  "description": "Planning perso en vue semaine : créneaux bloqués et tâches récurrentes.",
+  "description": "Planning perso en vue semaine ou mois : créneaux bloqués et tâches récurrentes.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

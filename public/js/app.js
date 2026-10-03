@@ -11,6 +11,7 @@ import { initDetail } from "./detail.js";
 import { initCategories } from "./categories.js";
 import { initAccount } from "./account.js";
 import { initSession, boot } from "./session.js";
+import { initBack } from "./back.js";
 
 connectView({ render, renderToast });
 initBoard();
@@ -20,6 +21,7 @@ initDetail();
 initCategories();
 initAccount();
 initSession();
+initBack();
 
 // ------------------------------------------------------------ Clavier
 const SHORTCUTS = { ArrowLeft: goPrev, ArrowRight: goNext, t: goToday, n: newItem };

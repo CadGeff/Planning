@@ -10,7 +10,7 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       name="description"
-      content="Semainier : planning perso en vue semaine, créneaux bloqués et tâches récurrentes."
+      content="Semainier : planning perso en vue semaine ou mois, créneaux bloqués et tâches récurrentes."
     />
     <meta name="theme-color" content="#F5F6FB" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#10131C" media="(prefers-color-scheme: dark)" />
@@ -70,6 +70,11 @@
           <h1>Semainier</h1>
           <span class="wk" id="wk"></span>
         </div>
+        <div class="view-seg" id="viewSeg" role="group" aria-label="Vue">
+          <button data-view="day" aria-pressed="false">Jour</button>
+          <button data-view="week" aria-pressed="false">Semaine</button>
+          <button data-view="month" aria-pressed="false">Mois</button>
+        </div>
         <nav class="nav" aria-label="Navigation">
           <button class="btn icon" id="prev" aria-label="Précédent" title="Précédent (←)">‹</button>
           <button class="btn" id="today" title="Aujourd'hui (T)">Aujourd'hui</button>
@@ -118,14 +123,18 @@
       </header>
 
       <div class="bar" id="bar"></div>
-      <div class="legend" id="legend" role="group" aria-label="Catégories"></div>
+      <div class="legend-row">
+        <div class="legend" id="legend" role="group" aria-label="Catégories"></div>
+        <button class="btn tog" id="upToggle" aria-pressed="false" hidden>À venir</button>
+      </div>
       <div class="strip" id="strip" role="group" aria-label="Jour affiché"></div>
       <div class="board" id="board"></div>
+      <div class="overview" id="overview" hidden></div>
 
       <footer class="foot">
-        <p>Clique sur une case vide de la grille pour bloquer un créneau à cette heure.</p>
+        <p id="hint"></p>
         <p class="keys">
-          <span><kbd>←</kbd> <kbd>→</kbd> semaine</span><span><kbd>T</kbd> aujourd'hui</span
+          <span><kbd>←</kbd> <kbd>→</kbd> période</span><span><kbd>T</kbd> aujourd'hui</span
           ><span><kbd>N</kbd> nouvel élément</span>
         </p>
       </footer>

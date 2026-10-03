@@ -1,5 +1,6 @@
-// La planche : grille de la semaine (ou du jour sur mobile), ligne « À faire », légende,
-// barre d'état, navigation, et création d'un créneau au clic sur une case vide.
+// La planche : grille de la semaine (ou du jour sur écran étroit), ligne « À faire », légende,
+// barre d'état, choix de la vue, navigation, et création d'un élément au clic sur une case vide.
+// Les vues d'ensemble (mois, « À venir », semaine en liste) sont fabriquées par views.js.
 
 import {
   pad,
@@ -17,10 +18,12 @@ import {
 } from "./recurrence.js";
 import { CATS, LAST } from "./items.js";
 import { layout } from "./layout.js";
+import { monthWeeks, addMonths, blockMinutes, isRecurring } from "./month.js";
+import { overviewHtml } from "./views.js";
 import { Store } from "./store.js";
 import { carriedFor, isCarrying, taskDone } from "./carry.js";
 import { state, catLabel, toggleDone, todayDate } from "./state.js";
-import { $, esc, applyGeometry, anyDialogOpen } from "./dom.js";
+import { $, esc, applyGeometry, anyDialogOpen, CHECK } from "./dom.js";
 import { openDetail } from "./detail.js";
 import { openForm } from "./form.js";
 import { openCats } from "./categories.js";
@@ -29,21 +32,95 @@ import { resetDemo } from "./menu.js";
 const fmtShort = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
 /** « mar. 29 » : jour prévu d'une tâche reportée. */
 const fmtFrom = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric" });
-const CHECK =
-  '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.2 4.2 7.3 8 2.8" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const fmtMonth = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 /** Plage horaire par défaut, élargie si un élément déborde. */
 const DAY_START = 7;
 const DAY_END = 22;
 
+/** Préférences d'affichage mémorisées sur l'appareil. */
+const VIEW_KEY = "semainier.view";
+const UPCOMING_KEY = "semainier.upcoming";
+
 const board = $("board");
+const overview = $("overview");
 const narrowMq = matchMedia("(max-width: 760px)");
 const canHover = matchMedia("(hover: hover) and (pointer: fine)");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-/** Affichage mobile : un seul jour à la fois. */
+/** Écran étroit : la grille horaire n'affiche qu'un jour à la fois. */
 export const narrow = () => narrowMq.matches;
+
+/**
+ * Disposition affichée, déduite de la vue choisie et de la largeur de l'écran :
+ * « grid » (grille horaire : la semaine, ou un jour sur écran étroit), « list » (semaine en
+ * liste, écran étroit seulement) ou « month ».
+ * @returns {"grid"|"list"|"month"}
+ */
+function layoutOf() {
+  if (state.view === "month") return "month";
+  return narrow() && state.view === "week" ? "list" : "grid";
+}
+
+function remember(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* stockage indisponible : la préférence ne vaut que pour cette session */
+  }
+}
+
+/**
+ * @param {"day"|"week"|"month"} view
+ * @param {boolean} [keep]  mémoriser ce choix sur l'appareil (non pour un simple détour par une journée)
+ */
+function setView(view, keep = true) {
+  state.view = view;
+  state.pick = null;
+  state.upcomingMore = false;
+  if (keep) remember(VIEW_KEY, view);
+  render();
+}
+
+/**
+ * Le jour `day` est-il dans la période affichée ? Sur écran étroit, la réponse est toujours oui :
+ * on ne déplace pas l'affichage sous le doigt de quelqu'un qui vient d'ajouter un élément.
+ * @param {string} day "AAAA-MM-JJ"
+ */
+export function isShown(day) {
+  if (narrow()) return true;
+  if (layoutOf() !== "month") return ds(mondayOf(parse(day))) === ds(mondayOf(state.sel));
+  const weeks = monthWeeks(state.sel);
+  return day >= ds(weeks[0][0]) && day <= ds(weeks[weeks.length - 1][6]);
+}
+
+/** Ce que dit le pied de page, selon ce qu'un clic fait dans la vue affichée. */
+const HINTS = {
+  grid: "Clique sur une case vide de la grille pour bloquer un créneau à cette heure.",
+  month: "Clique sur un jour pour y ajouter un élément, sur un élément pour l'ouvrir.",
+  "month-narrow": "Touche un jour pour voir ce qu'il contient.",
+  list: "Touche une date pour ouvrir la journée.",
+};
+
+/**
+ * Repère l'élément qui a le focus, pour le lui rendre après un rendu qui remplace le HTML.
+ * @returns {string | null} sélecteur CSS de l'élément équivalent dans le nouveau rendu
+ */
+function focusKey() {
+  const a = document.activeElement;
+  if (!(a instanceof HTMLElement) || !a.closest("#board, #overview, #legend, #strip")) return null;
+  if (a.id) return `#${CSS.escape(a.id)}`;
+  const data = Object.entries(a.dataset);
+  if (!data.length) return null;
+  const zone = a.closest("#board, #overview, #legend, #strip");
+  const attrs = data
+    .filter(([k]) => !["top", "height", "lane", "lanes"].includes(k))
+    .map(([k, v]) => `[data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${CSS.escape(v ?? "")}"]`)
+    .join("");
+  // La classe distingue la case à cocher du titre d'un même élément.
+  const cls = a.classList.length ? `.${CSS.escape(a.classList[0])}` : "";
+  return `#${zone.id} ${a.tagName.toLowerCase()}${cls}${attrs}`;
+}
 const hourPx = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--hour")) || 52;
 const occsFor = (day) => state.items.filter((it) => occurs(it, day));
-const isRecurring = (it) => it.recur && it.recur !== "none";
 
 // ------------------------------------------------------------------ Rendu
 /** Barre d'état : avancement des tâches du jour, bandeau de démo. */
@@ -68,15 +145,57 @@ function renderStatus() {
 }
 
 export function render() {
+  // Le détail d'un jour n'a de sens que pour le jour sélectionné.
+  if (state.pick && state.pick !== ds(state.sel)) state.pick = null;
+  const focused = focusKey();
+  const view = layoutOf();
+  $("app").dataset.layout = view;
+  $("hint").textContent = HINTS[view === "month" && narrow() ? "month-narrow" : view];
+  const up = $("upToggle");
+  up.hidden = view !== "month" || narrow();
+  up.setAttribute("aria-pressed", String(state.upcomingOpen));
+  // Sur grand écran, « Jour » n'existe pas : la grille de la semaine en tient lieu.
+  const pressed = view === "month" ? "month" : view === "list" || !narrow() ? "week" : "day";
+  for (const b of $("viewSeg").querySelectorAll("button"))
+    b.setAttribute("aria-pressed", String(/** @type {HTMLElement} */ (b).dataset.view === pressed));
+  board.hidden = view !== "grid";
+  overview.hidden = view === "grid";
+
   const mon = mondayOf(state.sel);
   const week = [...Array(7)].map((_, i) => addDays(mon, i));
+  if (view === "month") {
+    const name = fmtMonth.format(state.sel);
+    $("wk").innerHTML = `<b>${esc(name[0].toUpperCase() + name.slice(1))}</b>`;
+  } else {
+    const sun = week[6];
+    $("wk").innerHTML =
+      `<b>S${isoWeek(mon)}</b> · ${fmtShort.format(mon)} → ${fmtShort.format(sun)} ${sun.getFullYear()}`;
+  }
+
+  if (view === "grid") renderGrid(week);
+  else {
+    const month = state.sel.getMonth();
+    const days =
+      view === "list"
+        ? week
+        : monthWeeks(state.sel)
+            .flat()
+            .filter((d) => d.getMonth() === month);
+    renderLegend(blockMinutes(state.items, days.map(ds)), view === "list" ? "cette semaine" : "ce mois");
+    board.innerHTML = "";
+    overview.innerHTML = overviewHtml(view, narrow());
+  }
+  renderStatus();
+  if (focused) /** @type {HTMLElement | null} */ (document.querySelector(focused))?.focus({ preventScroll: true });
+}
+
+/** Grille horaire : les sept jours de la semaine, ou le jour sélectionné sur écran étroit. */
+function renderGrid(week) {
   const days = narrow() ? [state.sel] : week;
   const todayS = ds(new Date());
   const selS = ds(state.sel);
+  overview.innerHTML = "";
 
-  const sun = week[6];
-  $("wk").innerHTML =
-    `<b>S${isoWeek(mon)}</b> · ${fmtShort.format(mon)} → ${fmtShort.format(sun)} ${sun.getFullYear()}`;
   $("strip").innerHTML = week
     .map((d) => {
       const s = ds(d);
@@ -102,7 +221,13 @@ export function render() {
     return { d, s, when, cls, timed: layout(timed), untimed, carried: carriedFor(state.items, s, todayS) };
   });
   endH = Math.min(endH, 24);
-  renderLegend(perDay, days.length);
+  renderLegend(
+    blockMinutes(
+      state.items,
+      perDay.map((p) => p.s),
+    ),
+    days.length === 1 ? "ce jour" : "cette semaine",
+  );
 
   const dim = (it) => (state.focusCat && it.cat !== state.focusCat ? " dim" : "");
   const HOUR = hourPx();
@@ -173,21 +298,20 @@ export function render() {
   board.innerHTML = h;
   applyGeometry(board);
   board.dataset.start = String(startH);
-  renderStatus();
 }
 
-/** Légende : temps bloqué par catégorie ; un clic met une catégorie en avant, un second annule. */
-function renderLegend(perDay, nDays) {
-  const mins = Object.fromEntries(CATS.map((c) => [c, 0]));
-  for (const p of perDay)
-    for (const e of p.timed) if (e.kind === "block") mins[e.cat] = (mins[e.cat] || 0) + toMin(e.to) - toMin(e.from);
+/**
+ * Légende : temps bloqué par catégorie ; un clic met une catégorie en avant, un second annule.
+ * @param {Record<string, number>} mins  minutes de créneaux par catégorie sur la période affichée
+ * @param {string} period  « ce jour », « cette semaine » ou « ce mois »
+ */
+function renderLegend(mins, period) {
   const fmtH = (m) => {
     const h = Math.floor(m / 60);
     const r = m % 60;
     if (!h) return `${r} min`;
     return r ? `${h} h ${pad(r)}` : `${h} h`;
   };
-  const period = nDays === 1 ? "ce jour" : "cette semaine";
   $("legend").innerHTML = `${CATS.map(
     (c) => `
       <button class="cat-item" data-cat="${c}" aria-pressed="${state.focusCat === c}"
@@ -210,16 +334,19 @@ export function scrollToNow() {
 }
 
 // ------------------------------------------------------------ Navigation
-export const goPrev = () => {
-  state.sel = addDays(state.sel, narrow() ? -1 : -7);
+/** Avance ou recule d'une période : un jour, une semaine ou un mois selon la vue. */
+function step(dir) {
+  const view = layoutOf();
+  if (view === "month") state.sel = addMonths(state.sel, dir);
+  else state.sel = addDays(state.sel, dir * (view === "grid" && narrow() ? 1 : 7));
+  state.pick = null;
   render();
-};
-export const goNext = () => {
-  state.sel = addDays(state.sel, narrow() ? 1 : 7);
-  render();
-};
+}
+export const goPrev = () => step(-1);
+export const goNext = () => step(1);
 export const goToday = () => {
   state.sel = todayDate();
+  state.pick = null;
   render();
   scrollToNow();
 };
@@ -234,6 +361,15 @@ function slotAt(col, clientY) {
 }
 
 export function initBoard() {
+  // Vue et panneau choisis la dernière fois sur cet appareil.
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    state.view = v === "day" || v === "week" || v === "month" ? v : narrow() ? "day" : "week";
+    state.upcomingOpen = localStorage.getItem(UPCOMING_KEY) === "1";
+  } catch {
+    state.view = narrow() ? "day" : "week";
+  }
+
   board.addEventListener("click", (ev) => {
     const target = /** @type {HTMLElement} */ (ev.target);
     const t = target.closest("[data-toggle]");
@@ -276,6 +412,59 @@ export function initBoard() {
     ghost.textContent = `${fromMin(from)} – ${fromMin(to)}`;
   });
   board.addEventListener("mouseleave", () => ghost.remove());
+
+  // Vues d'ensemble : mois, « À venir », semaine en liste.
+  overview.addEventListener("click", (ev) => {
+    const target = /** @type {HTMLElement} */ (ev.target);
+    const hit = (/** @type {string} */ attr) => {
+      const n = target.closest(`[data-${attr}]`);
+      return n instanceof HTMLElement ? n : null;
+    };
+    const t = hit("toggle");
+    if (t) return void toggleDone(t.dataset.toggle, t.dataset.day);
+    const o = hit("open");
+    if (o) return openDetail(o.dataset.open, o.dataset.day);
+    if (hit("more")) {
+      state.upcomingMore = true;
+      return render();
+    }
+    const p = hit("pick");
+    if (p) {
+      // Un second appui sur le même jour, ou « Fermer », revient à la liste « À venir ».
+      const day = p.dataset.pick;
+      state.pick = day && day !== state.pick ? day : null;
+      if (state.pick) state.sel = parse(state.pick);
+      render();
+      overview
+        .querySelector(".dayp")
+        ?.scrollIntoView({ block: "nearest", behavior: reducedMotion.matches ? "auto" : "smooth" });
+      return;
+    }
+    const g = hit("goto");
+    if (g) {
+      // Ouvrir une journée : la grille horaire, sur ce jour. Un détour : la vue mémorisée ne change pas.
+      state.sel = parse(g.dataset.goto);
+      setView(narrow() ? "day" : "week", false);
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    // Toute la puce ouvre le détail, pas seulement son titre.
+    const c = target.closest(".chip")?.querySelector("[data-open]");
+    if (c instanceof HTMLElement) return openDetail(c.dataset.open, c.dataset.day);
+    const a = hit("add");
+    if (a) openForm(null, { date: a.dataset.add, kind: "task" });
+  });
+
+  $("upToggle").onclick = () => {
+    state.upcomingOpen = !state.upcomingOpen;
+    remember(UPCOMING_KEY, state.upcomingOpen ? "1" : "0");
+    render();
+  };
+
+  $("viewSeg").addEventListener("click", (ev) => {
+    const b = /** @type {HTMLElement} */ (ev.target).closest("[data-view]");
+    if (b instanceof HTMLElement) setView(/** @type {"day"|"week"|"month"} */ (b.dataset.view));
+  });
 
   $("legend").addEventListener("click", (e) => {
     const target = /** @type {HTMLElement} */ (e.target);

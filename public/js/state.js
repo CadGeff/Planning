@@ -22,8 +22,16 @@ export const state = {
   hasData: false,
   /** @type {string|null} */
   email: null,
-  /** Jour sélectionné : la semaine affichée est celle qui le contient. */
+  /** Jour sélectionné : la semaine ou le mois affichés sont ceux qui le contiennent. */
   sel: todayDate(),
+  /** @type {"day"|"week"|"month"} vue choisie sur cet appareil (« day » n'existe que sur écran étroit) */
+  view: "week",
+  /** @type {string|null} vue mois sur écran étroit : jour dont le détail est affiché sous le calendrier */
+  pick: null,
+  /** Vue mois sur grand écran : le panneau « À venir » est ouvert. */
+  upcomingOpen: false,
+  /** Écran étroit : la liste « À venir » est dépliée au-delà de deux semaines. */
+  upcomingMore: false,
   /** @type {Record<string, string>} nom de chaque catégorie */
   labels: { ...DEFAULT_LABELS },
   /** @type {string|null} catégorie mise en avant via la légende */

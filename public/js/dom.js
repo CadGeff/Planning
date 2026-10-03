@@ -11,6 +11,10 @@ const ENTITIES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "
 /** Échappe un texte avant de l'insérer dans du HTML. @param {unknown} s */
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ENTITIES[c]);
 
+/** Coche des cases à cocher dessinées (tâches). */
+export const CHECK =
+  '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.2 4.2 7.3 8 2.8" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 /**
  * Crée un élément sans passer par du HTML : le texte est toujours posé en textContent.
  * @template {keyof HTMLElementTagNameMap} K

@@ -173,6 +173,7 @@ export async function resetDemo() {
   state.items = sample();
   await Store.saveMany(state.items.map(clone));
   state.sel = todayDate();
+  state.pick = null;
   setStatus("Démo réinitialisée.");
   render();
   scrollToNow();
