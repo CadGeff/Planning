@@ -392,15 +392,52 @@ test.describe("bouton retour", () => {
     // Chromium de test ne sait pas se dire « installé » : on passe par le signal d'iOS, que l'application lit aussi.
     await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value: true }));
     await open(page);
+    const entry = () => page.evaluate(() => history.state?.semainier ?? null);
+    const length = () => page.evaluate(() => history.length);
+
+    // Rien n'est ajouté à l'historique avant le premier geste : les navigateurs sautent, au retour,
+    // les entrées sur lesquelles on n'a rien touché.
+    const atLoad = await length();
+    expect(await entry()).toBe(null);
+    await page.locator(".brand h1").click();
+    expect(await entry()).toBe("guard");
+    expect(await length()).toBe(atLoad + 1);
+
+    // Le retour ramène sur l'entrée de garde existante, sans en créer de nouvelle.
     for (let i = 0; i < 3; i++) {
       await page.goBack();
+      await expect.poll(entry).toBe("guard");
       await stays(page);
       await expect(page.locator("#board")).toBeVisible();
     }
-    // Et une fenêtre ouverte se ferme toujours au retour.
+    expect(await length()).toBe(atLoad + 1);
+
+    // Et une fenêtre ouverte se ferme toujours au retour, sans quitter l'application ensuite.
     await page.getByRole("button", { name: "Plus d'options" }).click();
     await page.goBack();
     await expect(page.locator("#menu")).toBeHidden();
+    expect(await entry()).toBe("guard");
+    await page.goBack();
+    await expect.poll(entry).toBe("guard");
     await stays(page);
+  });
+
+  test("application installée : le premier geste peut être l'ouverture du menu", async ({ page }) => {
+    await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value: true }));
+    await open(page);
+    await page.getByRole("button", { name: "Plus d'options" }).click();
+    await expect(page.locator("#menu")).toBeVisible();
+    await page.goBack();
+    await expect(page.locator("#menu")).toBeHidden();
+    expect(await page.evaluate(() => history.state?.semainier ?? null)).toBe("guard");
+    await stays(page);
+  });
+
+  test("onglet de navigateur ordinaire : aucune entrée de garde, le retour n'est pas retenu", async ({ page }) => {
+    await open(page);
+    const atLoad = await page.evaluate(() => history.length);
+    await page.locator(".brand h1").click();
+    expect(await page.evaluate(() => history.state)).toBe(null);
+    expect(await page.evaluate(() => history.length)).toBe(atLoad);
   });
 });
