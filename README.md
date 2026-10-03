@@ -198,6 +198,13 @@ npm run test:e2e                # tests de bout en bout
 
 Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHELL` dans `public/sw.js` et incrémenter `CACHE` (le test hors connexion échoue sinon).
 
+### Publier une version
+
+1. `npm run check` et `npm run test:e2e` passent, et la CI est verte.
+2. Relire ce README phrase par phrase contre le code : fonctionnalités, sécurité, modèle de menace, modèle de données. Un test vérifie la section « Structure », les liens et les versions annoncées, mais pas le fond des phrases.
+3. Refaire les captures de `docs/` si l'interface a changé.
+4. Mettre à jour la version dans `package.json`, poser le tag, publier la release.
+
 ## Qualité et tests
 
 Chaque push déclenche la [CI GitHub Actions](.github/workflows/ci.yml) :
@@ -207,7 +214,7 @@ Chaque push déclenche la [CI GitHub Actions](.github/workflows/ci.yml) :
 | Lint | ESLint | Erreurs courantes, variables inutilisées, `===` obligatoire, pas de `var` |
 | Format | Prettier | Mise en forme homogène de tout le code |
 | Types | TypeScript sur annotations JSDoc | Cohérence des types sans étape de compilation (`jsconfig.json`) |
-| Tests unitaires | `node:test` | Récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde et restauration, traduction des erreurs |
+| Tests unitaires | `node:test` | Récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde et restauration, traduction des erreurs, cohérence du README avec le dépôt |
 | Tests de bout en bout | Playwright (Chromium) | Démo, report des tâches, connexion, mot de passe, 2FA, sauvegarde, sécurité, hors connexion |
 
 Les tests de bout en bout tournent sur le site servi avec ses en-têtes de production, et **simulent Supabase** ([`tests/e2e/fixtures.js`](tests/e2e/fixtures.js)) : aucun test ne touche la vraie base, et la simulation reproduit la politique RLS de la 2FA (aucune donnée sans session `aal2`). Dependabot propose chaque mois les mises à jour des outils et des actions, validées par la CI avant fusion.
