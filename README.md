@@ -29,6 +29,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Report des tâches non faites** : une tâche ponctuelle qui n'a pas été cochée réapparaît le lendemain dans « À faire », sans heure, pendant 7 jours au plus. Elle reste visible à sa date prévue, et la cocher la marque faite partout. Le report est calculé à l'affichage : rien n'est modifié en base tant qu'on ne coche pas.
 - **Pour une tâche récurrente, cocher ne vaut que pour le jour même** : l'occurrence suivante revient vierge. On peut aussi retirer un seul jour d'une série sans toucher au reste.
 - **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps des créneaux bloqués par catégorie, sur la semaine ou sur le jour affiché, et un clic sur une catégorie atténue les autres. Les noms sont modifiables et synchronisés entre appareils.
+- **Synchronisation entre appareils** : le planning se recharge au retour sur l'onglet, au retour du réseau, et chaque minute tant qu'il reste affiché, sans interrompre une saisie en cours.
 - **Repères visuels** : jours passés atténués, jour courant encadré, week-end teinté, ligne de l'heure actuelle, compteur des tâches du jour.
 - **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
 - **Notifications** empilées en bas de l'écran, trois au maximum : une confirmation disparaît seule, une erreur ou le résultat d'un import reste jusqu'au clic sur « OK ».
@@ -268,7 +269,7 @@ docs/                     captures du README
 
 - [ ] Vue mois
 - [ ] Glisser-déposer et redimensionner les créneaux à la souris
-- [ ] Synchronisation instantanée entre appareils (aujourd'hui : à chaque retour sur l'onglet ou du réseau)
+- [ ] Synchronisation instantanée entre appareils (aujourd'hui : à chaque retour sur l'onglet ou du réseau, et chaque minute tant qu'il reste affiché)
 - [ ] Statistiques dans la durée : temps bloqué par catégorie au fil des semaines, taux de réalisation et séries des tâches récurrentes
 
 ## Comment ce projet a été réalisé

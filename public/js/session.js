@@ -3,8 +3,8 @@
 import { sample, cleanLabels } from "./items.js";
 import { Store, configError } from "./store.js";
 import { state, clone, render, setStatus, dropStatus } from "./state.js";
-import { $, field, button, focusSoon } from "./dom.js";
-import { syncMenu } from "./menu.js";
+import { $, field, button, focusSoon, anyDialogOpen } from "./dom.js";
+import { syncMenu, isMenuOpen } from "./menu.js";
 import { scrollToNow } from "./board.js";
 import { loadSettings } from "./categories.js";
 import { normalizeCode, isValidCode, CODE_HINT } from "./account.js";
@@ -29,15 +29,19 @@ async function codeRequired() {
   return true;
 }
 
+/** Intervalle du rechargement discret quand l'onglet reste affiché. */
+const RESYNC_MS = 60_000;
+
 /** Dernier message d'erreur de chargement affiché, tant qu'aucun chargement n'a réussi depuis. */
 let loadError = "";
 
 /**
  * Recharge les éléments et les réglages depuis le stockage.
- * @param {{ silent?: boolean, mfaChecked?: boolean }} [opts]
- *   silent : garder le message affiché ; mfaChecked : la 2FA vient d'être vérifiée, inutile de redemander
+ * @param {{ silent?: boolean, mfaChecked?: boolean, background?: boolean }} [opts]
+ *   silent : garder le message affiché ; mfaChecked : la 2FA vient d'être vérifiée, inutile de redemander ;
+ *   background : rechargement périodique, dont un échec passager n'est pas signalé
  */
-export async function reload({ silent = false, mfaChecked = false } = {}) {
+export async function reload({ silent = false, mfaChecked = false, background = false } = {}) {
   if (state.pending) return;
   try {
     if (!mfaChecked && (await codeRequired())) return;
@@ -58,6 +62,8 @@ export async function reload({ silent = false, mfaChecked = false } = {}) {
     await loadSettings();
     render();
   } catch (err) {
+    // Le planning affiché reste valable : le prochain passage réessaiera, sans déranger d'ici là.
+    if (background && state.hasData) return;
     state.loaded = true;
     // Une seule erreur de chargement à l'écran, même si plusieurs rechargements échouent.
     if (loadError) dropStatus(loadError);
@@ -187,6 +193,13 @@ export function initSession() {
     if (document.visibilityState === "visible") resync();
   });
   window.addEventListener("online", resync);
+  // Onglet resté affiché : même rechargement chaque minute, sauf pendant une saisie
+  // (fenêtre ou menu ouvert), pour qu'un écran oublié ne reste pas périmé.
+  setInterval(() => {
+    if (document.visibilityState !== "visible" || !navigator.onLine) return;
+    if (anyDialogOpen() || isMenuOpen()) return;
+    if (state.loaded && Store.mode === "supabase") reload({ silent: true, background: true });
+  }, RESYNC_MS);
 }
 
 export async function boot() {

@@ -39,6 +39,78 @@ test("connexion puis chargement du planning", async ({ page }) => {
   expect(s.log.filter((r) => r.path === "/auth/v1/user").length).toBe(1);
 });
 
+const row = (id, title) => ({
+  id,
+  title,
+  kind: "task",
+  start_date: "2026-09-30",
+  recur: "daily",
+  cat: "vert",
+  done: {},
+  skipped: {},
+});
+
+test.describe("onglet resté affiché", () => {
+  const reads = (s) => s.log.filter((r) => r.method === "GET" && r.path === "/rest/v1/items").length;
+  /** Laisse aboutir les lectures en cours et leurs nouvelles tentatives, sans atteindre la minute suivante. */
+  async function settle(page, s) {
+    let last = -1;
+    while (last !== reads(s)) {
+      last = reads(s);
+      await page.clock.runFor(5_000);
+      await page.waitForTimeout(400);
+    }
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await page.clock.install({ time: new Date("2026-10-01T10:00:00") });
+  });
+
+  test("le planning se recharge seul chaque minute", async ({ page }) => {
+    const s = await mockSupabase(page, { items: [row("a1", "Depuis le PC")] });
+    await login(page);
+    await expect(page.locator("#board")).toContainText("Depuis le PC");
+
+    // Un autre appareil ajoute un élément : il apparaît sans toucher à cet onglet.
+    s.items.push(row("a2", "Depuis le téléphone"));
+    await page.clock.runFor(61_000);
+    await expect(page.locator("#board")).toContainText("Depuis le téléphone");
+  });
+
+  test("pas de rechargement pendant une saisie : ce qui est tapé reste en place", async ({ page }) => {
+    const s = await mockSupabase(page, { items: [row("a1", "Depuis le PC")] });
+    await login(page);
+    await expect(page.locator("#board")).toContainText("Depuis le PC");
+
+    await page.getByRole("button", { name: "Ajouter un élément" }).click();
+    await page.getByLabel("Intitulé").fill("En cours de saisie");
+    const before = reads(s);
+    s.items.push(row("a2", "Depuis le téléphone"));
+    await page.clock.runFor(61_000);
+    await settle(page, s);
+    expect(reads(s)).toBe(before);
+    await expect(page.getByLabel("Intitulé")).toHaveValue("En cours de saisie");
+
+    // Fenêtre fermée : le passage suivant rattrape le retard.
+    await page.keyboard.press("Escape");
+    await page.clock.runFor(61_000);
+    await expect(page.locator("#board")).toContainText("Depuis le téléphone");
+  });
+
+  test("une panne passagère pendant ce rechargement n'affiche rien et ne vide pas le planning", async ({ page }) => {
+    const s = await mockSupabase(page, { items: [row("a1", "Depuis le PC")] });
+    await login(page);
+    await expect(page.locator("#board")).toContainText("Depuis le PC");
+
+    s.fail.itemsGet = 10;
+    await page.clock.runFor(61_000);
+    await expect.poll(() => s.fail.itemsGet).toBeLessThan(10);
+    await settle(page, s);
+    await expect(page.locator(".toast")).toHaveCount(0);
+    await expect(page.locator("#board")).toContainText("Depuis le PC");
+  });
+});
+
 test("changement de mot de passe : validations, refus serveur, puis succès", async ({ page }) => {
   const s = await mockSupabase(page, { samePasswordOnce: true });
   await login(page);
