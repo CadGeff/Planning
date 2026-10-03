@@ -31,7 +31,7 @@ export function openDetail(id, day) {
     if (isCarrying(it, ds(new Date()))) status += " · reportée à aujourd'hui";
   }
   $("detMeta").innerHTML = `
-    <span><b>${esc(fmtLong.format(parse(date)))}</b>${it.from ? ` · ${it.from} → ${it.to}` : " · sans heure"}</span>
+    <span><b>${esc(fmtLong.format(parse(date)))}</b>${it.from ? ` · ${esc(it.from)} → ${esc(it.to)}` : " · sans heure"}</span>
     <span>${it.kind === "block" ? "Créneau bloqué" : "Tâche"} · ${esc(catLabel(it.cat))}</span>
     <span>${esc(recurText(it))}</span>
     ${status ? `<span>${status}</span>` : ""}`;

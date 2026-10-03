@@ -11,7 +11,7 @@
   },
   "scripts": {
     "serve": "node tests/server.js",
-    "test": "node --test \"tests/unit/*.test.js\"",
+    "test": "node --test \"tests/unit/*.test.js\" \"tests/db/*.test.js\"",
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -20,6 +20,7 @@
     "check": "npm run lint && npm run format:check && npm run typecheck && npm test"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "eslint": "10.11.0",

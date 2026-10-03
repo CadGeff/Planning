@@ -163,9 +163,9 @@ export function render() {
       h += `<div class="ev ${e.kind === "task" ? "task" : "block"}${ht < 40 ? " short" : ""}${dn ? " done" : ""}${dim(e)}" role="button" tabindex="0"
         data-open="${esc(e.id)}" data-day="${p.s}" data-cat="${esc(e.cat || "bleu")}" title="${esc(tip)}"
         data-top="${top + 1}" data-height="${ht}" data-lane="${e.lane}" data-lanes="${e.lanes || 1}"
-        aria-label="${esc(e.title)}, ${e.from} à ${e.to}${moved ? ", reportée à aujourd'hui" : ""}">
+        aria-label="${esc(e.title)}, ${esc(e.from)} à ${esc(e.to)}${moved ? ", reportée à aujourd'hui" : ""}">
         ${e.kind === "task" ? `<button class="chk" role="checkbox" aria-checked="${dn}" aria-label="Marquer comme faite" data-toggle="${esc(e.id)}" data-day="${p.s}">${CHECK}</button>` : ""}
-        <span class="bd"><span class="tt">${esc(e.title)}</span><span class="tm">${e.from}–${e.to}${isRecurring(e) ? " ↻" : ""}${moved ? " ↷" : ""}</span></span>
+        <span class="bd"><span class="tt">${esc(e.title)}</span><span class="tm">${esc(e.from)}–${esc(e.to)}${isRecurring(e) ? " ↻" : ""}${moved ? " ↷" : ""}</span></span>
       </div>`;
     }
     h += `</div>`;

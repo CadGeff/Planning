@@ -49,7 +49,9 @@ function makeLocalStore(mode, key) {
     async init() {
       return { signedIn: true, email: null };
     },
-    async signOut() {},
+    async signOut() {
+      return true;
+    },
     onSignedOut() {},
     /** @returns {Promise<Item[] | null>} null si rien n'a jamais été enregistré */
     async list() {
@@ -175,25 +177,41 @@ function makeSupabaseStore() {
       uid = data.user?.id;
       return { email: data.user?.email };
     },
-    /** Portée « global » : la déconnexion ferme la session sur tous les appareils. */
+    /**
+     * Portée « global » : la déconnexion ferme la session sur tous les appareils.
+     * Cet appareil est déconnecté dans tous les cas ; si le serveur n'a pas répondu,
+     * les autres ne le sont pas.
+     * @returns {Promise<boolean>} false si les autres appareils n'ont pas pu être déconnectés
+     */
     async signOut() {
-      await auth.signOut({ scope: "global" });
+      try {
+        const { error } = await auth.signOut({ scope: "global" });
+        return !error;
+      } catch {
+        return false;
+      }
     },
-    /** Ferme les autres sessions (après un changement de mot de passe ou l'activation de la 2FA). */
+    /**
+     * Ferme les autres sessions (après un changement de mot de passe ou l'activation de la 2FA).
+     * Non bloquant : l'opération principale a déjà réussi.
+     * @returns {Promise<boolean>} false si le serveur n'a pas confirmé
+     */
     async signOutOthers() {
       try {
-        await auth.signOut({ scope: "others" });
+        const { error } = await auth.signOut({ scope: "others" });
+        return !error;
       } catch {
-        /* non bloquant */
+        return false;
       }
     },
     onSignedOut(fn) {
       signedOutHandlers.push(fn);
     },
+    /** @returns {Promise<boolean>} false si les autres sessions n'ont pas pu être fermées */
     async changePassword(password) {
       check(await auth.updateUser({ password }));
       // Un appareil volé ou oublié perd l'accès.
-      await this.signOutOthers();
+      return this.signOutOthers();
     },
 
     // ----- Double authentification (TOTP), optionnelle

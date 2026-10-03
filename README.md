@@ -18,7 +18,7 @@ Planning personnel en vue semaine, pensé comme une page de cahier : on y **bloq
 
 Les outils de planning grand public couvrent soit l'agenda (Google Calendar), soit les listes de tâches (Todoist, Trello), rarement les deux dans une même vue. Il me fallait une page unique pour organiser mes journées en *time blocking* : poser des blocs de travail dans la semaine, avec à côté les tâches qui reviennent (tous les jours, certains jours de la semaine, une fois par mois) et que je coche au fil de l'eau.
 
-J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et les bibliothèques sont dans ce dépôt. Les seules briques externes sont l'hébergement statique et une base Postgres, remplaçables toutes les deux.
+J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et les bibliothèques sont dans ce dépôt. Les seules briques externes sont l'hébergement statique et Supabase (base Postgres, authentification, API), remplaçables toutes les deux.
 
 ## Fonctionnalités
 
@@ -28,14 +28,14 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 - **Récurrence** quotidienne, hebdomadaire (jours au choix) ou mensuelle. Le 31 retombe sur le dernier jour des mois courts.
 - **Report des tâches non faites** : une tâche ponctuelle qui n'a pas été cochée réapparaît le lendemain dans « À faire », sans heure, pendant 7 jours au plus. Elle reste visible à sa date prévue, et la cocher la marque faite partout. Le report est calculé à l'affichage : rien n'est modifié en base tant qu'on ne coche pas.
 - **Pour une tâche récurrente, cocher ne vaut que pour le jour même** : l'occurrence suivante revient vierge. On peut aussi retirer un seul jour d'une série sans toucher au reste.
-- **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps bloqué par catégorie sur la semaine, et un clic sur une catégorie efface les autres. Les noms sont modifiables et synchronisés entre appareils.
+- **Catégories nommées** (Travail, Sport & santé, Admin…) : la légende affiche le temps bloqué par catégorie sur la semaine, et un clic sur une catégorie atténue les autres. Les noms sont modifiables et synchronisés entre appareils.
 - **Repères visuels** : jours passés atténués, jour courant encadré, week-end teinté, ligne de l'heure actuelle, compteur des tâches du jour.
 - **Thème Auto, Clair ou Sombre**, réglable sur chaque appareil. Auto suit le système.
 - **Notifications** empilées en bas de l'écran, trois au maximum : une confirmation disparaît seule, une erreur ou le résultat d'un import reste jusqu'au clic sur « OK ».
-- **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine, <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
-- **Sauvegarde et restauration** : l'export JSON contient le planning et les noms des catégories ; l'import n'ajoute que ce qui manque, sans doublon. Le menu rappelle quand la dernière sauvegarde date de plus de 30 jours.
+- **Raccourcis clavier** : <kbd>←</kbd> <kbd>→</kbd> pour changer de semaine (de jour sur mobile), <kbd>T</kbd> pour aujourd'hui, <kbd>N</kbd> pour un nouvel élément.
+- **Sauvegarde et restauration** : l'export JSON contient le planning et les noms des catégories ; l'import n'ajoute que ce qui manque, sans doublon. Le menu rappelle quand la dernière sauvegarde faite depuis cet appareil date de plus de 30 jours.
 - **Double authentification (TOTP) optionnelle**, activable depuis le menu : QR code à scanner avec une application comme Aegis, puis code à 6 chiffres à chaque nouvelle connexion. Elle est imposée par la base de données, pas seulement par l'interface.
-- **Application installable (PWA)** : icône sur l'écran d'accueil, ouverture hors connexion.
+- **Application installable (PWA)** : icône sur l'écran d'accueil. Hors connexion, l'interface s'ouvre ; le planning lui-même demande le réseau, sauf en mode local ou démo.
 
 | Mode sombre | Mobile |
 |---|---|
@@ -45,12 +45,12 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 
 | Couche | Choix | Pourquoi |
 |---|---|---|
-| Interface | HTML, CSS et JavaScript natifs (modules ES), sans framework ni build | Le code servi est le code écrit : lisible dans le navigateur, déployé tel quel, aucune dépendance d'exécution à maintenir. |
+| Interface | HTML, CSS et JavaScript natifs (modules ES), sans framework ni build | Le code servi est le code écrit : lisible dans le navigateur, déployé tel quel. Une seule dépendance d'exécution : le client `supabase-js`, copié dans le dépôt. |
 | Données et authentification | [Supabase](https://supabase.com) : Postgres, Auth, API REST | Postgres standard et open source, sécurisé par Row Level Security, exportable avec `pg_dump`, auto-hébergeable. |
 | Hébergement | Cloudflare Pages | Site statique gratuit, déployé à chaque push, avec de vrais en-têtes HTTP de sécurité (`_headers`). |
-| Hors connexion | Service worker, stratégie « réseau d'abord » | Toujours la dernière version en ligne, et l'interface s'ouvre quand même sans réseau. |
+| Hors connexion | Service worker, stratégie « réseau d'abord » | Toujours la dernière version en ligne, et l'interface s'ouvre quand même sans réseau (pas les données, qui restent sur le serveur). |
 | Ressources | `supabase-js` et polices copiés dans le dépôt | Aucun CDN tiers : pas de fuite d'adresse IP vers Google Fonts, pas de dépendance à la disponibilité d'un CDN. |
-| Qualité | ESLint, Prettier, TypeScript (JSDoc), `node:test`, Playwright, GitHub Actions | Outils de développement uniquement : rien de tout cela n'est envoyé au navigateur. |
+| Qualité | ESLint, Prettier, TypeScript (JSDoc), `node:test`, PGlite, Playwright, GitHub Actions | Outils de développement uniquement : rien de tout cela n'est envoyé au navigateur. |
 
 ## Architecture
 
@@ -58,7 +58,7 @@ J'ai aussi voulu garder la main sur toute la chaîne. Le code, les polices et le
 flowchart LR
     subgraph Navigateur
         UI["Interface<br/>board, form, menu, session…"] --> ST["state.js<br/>état + file d'écritures"]
-        UI --> REC["recurrence.js · carry.js · layout.js<br/>items.js · backup.js · errors.js<br/>fonctions pures"]
+        UI --> REC["recurrence.js · carry.js · layout.js<br/>items.js · backup.js · errors.js<br/>logique sans DOM"]
         ST --> STO["store.js<br/>couche de stockage"]
         SW["sw.js<br/>cache hors connexion"]
     end
@@ -71,7 +71,7 @@ flowchart LR
 
 **Une règle, pas des occurrences.** La base stocke chaque élément une seule fois, avec sa règle de répétition. Les occurrences sont calculées à l'affichage par `recurrence.js`, et le report des tâches non faites par `carry.js` : deux modules de fonctions pures couverts par des tests. Deux objets JSON par élément gardent les exceptions : `done`, pour les jours cochés, et `skipped`, pour les jours retirés de la série.
 
-**Modules sans effet de bord.** Chaque module d'interface exporte une fonction `init…()` appelée par `app.js` : importer un module ne pose aucun écouteur et ne déclenche aucun rendu, ce qui rend l'ordre de démarrage explicite. La logique métier (récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde, traduction des erreurs) vit dans des modules purs, testés sous Node sans navigateur.
+**Démarrage explicite.** Les modules d'interface qui posent des écouteurs exportent une fonction `init…()` appelée par `app.js` : les importer ne pose aucun écouteur et ne déclenche aucun rendu, ce qui rend l'ordre de démarrage explicite. Seule exception, `store.js` choisit le mode de stockage et crée le client Supabase dès son import. La logique métier (récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde, traduction des erreurs) vit dans des modules sans accès au DOM, testés sous Node sans navigateur.
 
 **Trois modes, une interface.** `store.js` expose la même interface (`list`, `save`, `remove`…) derrière trois implémentations : Supabase en production, `localStorage` pour la démo publique (`#demo`), et un mode local quand `config.js` est vide. L'interface ne sait pas où vont les données.
 
@@ -90,23 +90,23 @@ flowchart LR
 | `cat` | `text` | Catégorie, parmi cinq couleurs |
 | `done`, `skipped` | `jsonb` | Occurrences cochées ou retirées : `{ "AAAA-MM-JJ": true }`. Pour une tâche ponctuelle, `done` retient le jour où elle a été faite |
 
-Une seconde table, `settings`, contient une ligne par utilisateur avec les noms des catégories (`cat_labels`), sous la même RLS. Toutes ces contraintes sont vérifiées par Postgres lui-même (voir [`supabase/schema.sql`](supabase/schema.sql)).
+Une seconde table, `settings`, contient une ligne par utilisateur avec les noms des catégories (`cat_labels`), sous la même RLS. Ces contraintes (valeurs autorisées, longueurs, cohérence des horaires) sont vérifiées par Postgres lui-même (voir [`supabase/schema.sql`](supabase/schema.sql)). Pour les colonnes JSON, la base vérifie seulement qu'il s'agit d'un objet : le détail de leur contenu est validé par l'application.
 
 ## Sécurité
 
-Le dépôt est public et la clé Supabase est visible dans le navigateur, comme dans toute application front-end. La sécurité repose donc entièrement sur le serveur :
+Le dépôt est public et la clé Supabase est visible dans le navigateur, comme dans toute application front-end. La protection des données repose donc sur le serveur ; le navigateur n'apporte qu'une défense en profondeur (CSP, échappement) :
 
 - **Row Level Security** sur les tables `items` et `settings` : chaque requête est filtrée par `auth.uid() = user_id`, en lecture comme en écriture. Un utilisateur authentifié ne peut ni lire, ni modifier, ni s'approprier la ligne d'un autre. Le rôle `anon` n'a aucun droit sur ces tables.
 - **Inscriptions désactivées** : le seul compte est créé à la main dans le tableau de bord Supabase.
-- **Seule la clé publishable est exposée.** L'application refuse de démarrer en mode Supabase si `config.js` contient une clé à privilèges (`sb_secret_…` ou `service_role`).
-- **Content Security Policy** stricte, envoyée en en-tête HTTP, **sans aucune exception `unsafe-inline`** : scripts, styles et polices servis uniquement par le site, aucun script, bloc `<style>` ni attribut `style=""` en ligne (les positions de la grille passent par le CSSOM), requêtes réseau limitées **au seul projet Supabase** de l'application (un script injecté ne pourrait pas exfiltrer vers un autre projet), pas de `<base>`, de formulaire externe ni d'objet embarqué.
+- **Seule la clé publishable est exposée.** Si `config.js` contient une clé à privilèges (`sb_secret_…` ou `service_role`), l'application n'envoie aucune requête à Supabase : elle affiche l'erreur et retombe en mode local.
+- **Content Security Policy** stricte, envoyée en en-tête HTTP, **sans aucune exception `unsafe-inline`** : scripts, styles et polices servis uniquement par le site, aucun script, bloc `<style>` ni attribut `style=""` en ligne (les positions de la grille passent par le CSSOM), requêtes réseau limitées **au site et au seul projet Supabase** de l'application (un script injecté ne pourrait pas envoyer de données à un autre serveur par `fetch`, image ou formulaire ; une CSP n'empêche pas, en revanche, de rediriger la page entière), pas de `<base>`, de formulaire externe ni d'objet embarqué.
 - **En-têtes HTTP** (`_headers`) : HSTS, `frame-ancestors 'none'` et `X-Frame-Options` contre le clickjacking (doublés d'une vérification en JavaScript), `nosniff`, `Permissions-Policy` qui coupe caméra, micro, géolocalisation et paiement, isolation `Cross-Origin-Opener-Policy` / `Cross-Origin-Resource-Policy`. L'en-tête CORS ouvert qu'ajoute Cloudflare par défaut est retiré.
 - **Double authentification optionnelle, vérifiée côté serveur** : quand un facteur TOTP est actif, une politique RLS *restrictive* exige un jeton de niveau `aal2` sur `items` et `settings`. Un mot de passe volé donne une session `aal1`, qui ne lit ni n'écrit rien, même en appelant l'API directement. La fonction de contrôle vit dans un schéma `private` non exposé par l'API.
-- **Sessions** : changer de mot de passe ou activer la 2FA révoque les autres sessions ; « Se déconnecter » ferme la session sur tous les appareils.
-- **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, forme des objets JSON.
+- **Sessions** : changer de mot de passe ou activer la 2FA révoque les autres sessions ; « Se déconnecter » ferme la session sur tous les appareils. Si le serveur ne confirme pas la révocation, l'application le signale au lieu d'annoncer un succès.
+- **Contraintes SQL** sur chaque colonne : énumérations, cohérence des horaires, longueur des titres, type objet des colonnes JSON.
 - **Entrées non fiables** : les imports JSON sont limités à 2 Mo et revalidés champ par champ, et tout le texte affiché est échappé.
 - **Pas de tiers** : ni CDN, ni polices distantes, ni outil d'analyse d'audience. En-tête `no-referrer`.
-- **Vérifié automatiquement** : les tests de bout en bout contrôlent à chaque push les en-têtes, l'absence de violation de CSP, le blocage d'un script ou d'un style injecté, le refus d'affichage dans un cadre, l'échappement des titres et le parcours 2FA.
+- **Vérifié automatiquement**, à chaque exécution de la CI. Côté base, `schema.sql` est appliqué à un Postgres embarqué puis attaqué rôle par rôle : visiteur non connecté, autre utilisateur, session sans code quand la 2FA est active, valeurs hors contraintes. Côté navigateur, les tests de bout en bout contrôlent les en-têtes, l'absence de violation de CSP, le blocage d'un script ou d'un style injecté, le refus d'affichage dans un cadre, l'échappement des titres et le parcours 2FA.
 
 ### Modèle de menace
 
@@ -129,11 +129,11 @@ Un planning semble anodin, mais il décrit **où l'on est et quand** : horaires 
 | Mot de passe deviné, réutilisé ou fuité | Mot de passe long et unique généré par un gestionnaire ; limitation des tentatives par Supabase ; 2FA optionnelle imposée par RLS. |
 | Session restée ouverte sur un appareil perdu | Déconnexion globale, révocation des autres sessions au changement de mot de passe et à l'activation de la 2FA. |
 | Injection de script (XSS) via un titre ou un import | Texte toujours échappé, imports revalidés, CSP sans script inline ni domaine tiers. |
-| Exfiltration par un script injecté malgré tout | `connect-src` limité au seul projet Supabase de l'application. |
+| Exfiltration par un script injecté malgré tout | `connect-src`, `img-src` et `form-action` ferment les voies courantes (requêtes `fetch`, images, formulaires) vers un autre serveur. Limite connue : une CSP ne bloque ni la redirection de la page entière ni WebRTC ; la vraie parade reste d'empêcher l'injection. |
 | Page affichée dans un cadre piégé (clickjacking) | `frame-ancestors 'none'` et `X-Frame-Options: DENY` ; refus en JavaScript en secours. |
 | Bibliothèque compromise sur un CDN | Aucun CDN : `supabase-js` et les polices sont versionnés dans le dépôt. |
 | Perte des données (table vidée, projet supprimé par erreur) | Export JSON à la demande, rappel au bout de 30 jours, restauration sans doublon. Pas de sauvegarde automatique : elle obligerait à confier une clé `service_role` à un robot, ce qui contournerait RLS et la 2FA. |
-| Clé secrète commitée par erreur | L'application refuse de démarrer avec une clé `service_role` / `sb_secret_`, et GitHub bloque le push des secrets connus. |
+| Clé secrète commitée par erreur | L'application refuse de se connecter à Supabase avec une clé `service_role` / `sb_secret_` et affiche l'erreur, et GitHub bloque le push des secrets connus. La clé resterait à régénérer : elle serait déjà publique. |
 
 **Pourquoi la 2FA est optionnelle**
 
@@ -144,7 +144,7 @@ Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est un
 - **Appareil déverrouillé** : quiconque tient un téléphone ou un PC ouvert voit le planning. Le verrouillage de l'appareil reste la première ligne de défense.
 - **Jetons en `localStorage`** : un XSS réussi pourrait lire le jeton d'accès et le jeton de renouvellement stocké à côté. La CSP et l'échappement systématique rendent ce scénario très improbable. « Se déconnecter » révoque les jetons de renouvellement sur tous les appareils ; un jeton d'accès déjà émis reste valable jusqu'à son expiration, une heure par défaut.
 - **Données en clair côté serveur** : Supabase chiffre le disque, mais un administrateur du projet (ou de Supabase) peut lire les tables. Un chiffrement de bout en bout protégerait de ce cas, au prix de la recherche et de la synchro simple.
-- **Hébergeur** : Cloudflare voit passer les requêtes vers les fichiers du site (adresse IP, date), mais pas les données du planning, qui vont directement du navigateur à Supabase. Son réseau ajoute aussi les en-têtes `NEL` / `Report-To` (impossibles à retirer sur une adresse `pages.dev`) : en cas d'échec de chargement, le navigateur lui envoie un rapport d'erreur réseau, sans contenu de page. Le site ne dépend d'aucune fonctionnalité propre à Cloudflare : il se redéploie ailleurs tel quel.
+- **Hébergeur** : Cloudflare voit passer les requêtes vers les fichiers du site (adresse IP, date), mais l'hébergement du site ne voit pas les données du planning, qui vont directement du navigateur à l'API Supabase. Son réseau ajoute aussi les en-têtes `NEL` / `Report-To` (impossibles à retirer sur une adresse `pages.dev`) : en cas d'échec de chargement, le navigateur lui envoie un rapport d'erreur réseau, sans contenu de page. Le site ne dépend d'aucune fonctionnalité propre à Cloudflare : il se redéploie ailleurs tel quel.
 - **Chaîne d'approvisionnement** : une compromission du compte GitHub ou Cloudflare permettrait de servir un code modifié. Parade : mots de passe uniques, 2FA sur GitHub, Cloudflare et Supabase, accès de Cloudflare limité à ce seul dépôt. Les dépendances npm ne servent qu'au développement et ne sont jamais déployées ; les actions GitHub sont épinglées par empreinte de commit et le workflow n'a que le droit de lecture.
 
 ## Installer sa propre instance
@@ -152,7 +152,7 @@ Pour un outil ouvert plusieurs fois par jour, un code à chaque connexion est un
 ### 1. Base de données
 
 1. Créer un projet sur [supabase.com](https://supabase.com), de préférence dans une région européenne.
-2. Dans **SQL Editor**, exécuter [`supabase/schema.sql`](supabase/schema.sql). Le script est idempotent : on peut le relancer sans risque, et il faut le faire après chaque mise à jour qui le modifie.
+2. Dans **SQL Editor**, exécuter [`supabase/schema.sql`](supabase/schema.sql). Le script est idempotent : on peut le relancer sans risque, et il faut le faire après chaque mise à jour qui le modifie. Il crée ce qui manque et remet en place fonctions, déclencheurs et politiques ; il ne modifie pas une colonne déjà créée.
 3. Dans **Authentication → Sign In / Providers**, désactiver *Allow new users to sign up*.
 4. Dans **Authentication → Users → Add user**, créer son compte en cochant *Auto Confirm User*.
 
@@ -191,12 +191,12 @@ L'application elle-même n'a besoin d'aucune installation : les fichiers de `pub
 ```
 npm install                     # outils de développement (une fois)
 npm run serve                   # http://localhost:4173, avec les en-têtes de production
-npm run check                   # lint + format + types + tests unitaires
+npm run check                   # lint + format + types + tests unitaires et de la base
 npx playwright install chromium # navigateur de test (une fois)
 npm run test:e2e                # tests de bout en bout
 ```
 
-Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHELL` dans `public/sw.js` et incrémenter `CACHE` (le test hors connexion échoue sinon).
+Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHELL` dans `public/sw.js` et incrémenter `CACHE`. Un test unitaire signale un module de `js/` absent de `SHELL`, et le test hors connexion un fichier listé qui n'existe plus ; aucun test ne rappelle d'incrémenter `CACHE`.
 
 ### Publier une version
 
@@ -207,17 +207,18 @@ Après avoir ajouté ou renommé un fichier servi, mettre à jour la liste `SHEL
 
 ## Qualité et tests
 
-Chaque push déclenche la [CI GitHub Actions](.github/workflows/ci.yml) :
+Chaque push sur `main` et chaque pull request déclenchent la [CI GitHub Actions](.github/workflows/ci.yml) :
 
 | Étape | Outil | Ce qui est vérifié |
 |---|---|---|
 | Lint | ESLint | Erreurs courantes, variables inutilisées, `===` obligatoire, pas de `var` |
-| Format | Prettier | Mise en forme homogène de tout le code |
-| Types | TypeScript sur annotations JSDoc | Cohérence des types sans étape de compilation (`jsconfig.json`) |
+| Format | Prettier | Mise en forme homogène du code du projet (hors `vendor/`, `config.js`, SQL et Markdown) |
+| Types | TypeScript sur annotations JSDoc | Cohérence des types du code de `public/js/`, sans étape de compilation (`jsconfig.json`) |
 | Tests unitaires | `node:test` | Récurrence, report des tâches, placement des créneaux, validation des imports, sauvegarde et restauration, traduction des erreurs, cohérence du README avec le dépôt |
+| Tests de la base | `node:test` et [PGlite](https://pglite.dev) (Postgres embarqué) | `schema.sql` exécuté pour de vrai : relance et mise à niveau du script, droits de chaque rôle, RLS par utilisateur, 2FA imposée sur `items` et `settings`, contraintes |
 | Tests de bout en bout | Playwright (Chromium) | Démo, report des tâches, connexion, mot de passe, 2FA, sauvegarde, sécurité, hors connexion |
 
-Les tests de bout en bout tournent sur le site servi avec ses en-têtes de production, et **simulent Supabase** ([`tests/e2e/fixtures.js`](tests/e2e/fixtures.js)) : aucun test ne touche la vraie base, et la simulation reproduit la politique RLS de la 2FA (aucune donnée sans session `aal2`). Dependabot propose chaque mois les mises à jour des outils et des actions, validées par la CI avant fusion.
+Les tests de bout en bout tournent sur le site servi avec ses en-têtes de production, et **simulent Supabase** ([`tests/e2e/fixtures.js`](tests/e2e/fixtures.js)) : aucun test ne touche la vraie base, et la simulation reproduit la politique RLS de la 2FA (aucune donnée sans session `aal2`). Les vraies règles SQL sont testées à part ([`tests/db/schema.test.js`](tests/db/schema.test.js)) sur un Postgres embarqué, où seuls les rôles, le schéma `auth` et le contenu du jeton sont simulés. Ce que ces tests ne couvrent pas : la configuration du projet Supabase lui-même (inscriptions fermées, réglages d'authentification), qui se vérifie dans son tableau de bord. Dependabot propose chaque mois les mises à jour des outils et des actions, validées par la CI avant fusion ; la copie de `supabase-js` dans `vendor/` se met à jour à la main.
 
 ## Structure
 
@@ -243,8 +244,8 @@ public/                   le site, publié tel quel
     toast.js              notifications en bas de l'écran
     recurrence.js         dates et récurrence          ┐
     carry.js              report des tâches non faites │
-    layout.js             placement des créneaux       │ fonctions pures,
-    items.js              modèle, validation, exemple  │ testées sous Node
+    layout.js             placement des créneaux       │ logique sans DOM,
+    items.js              modèle, validation, exemple  │ testée sous Node
     backup.js             sauvegarde et restauration   │
     errors.js             traduction des erreurs       ┘
     dom.js, ids.js        utilitaires
@@ -252,6 +253,7 @@ public/                   le site, publié tel quel
   fonts/, icons/          polices (SIL OFL) et icônes
 supabase/schema.sql       tables, contraintes, RLS, 2FA
 tests/unit/               tests node:test
+tests/db/                 règles de la base, sur un Postgres embarqué
 tests/e2e/                tests Playwright et simulation de Supabase
 tests/server.js           serveur local avec les en-têtes de production
 .github/                  CI et Dependabot
@@ -273,7 +275,7 @@ Le Semainier a été développé avec Claude (Anthropic), utilisé comme binôme
 - **Mon rôle** : définir le besoin et les fonctionnalités, fixer le niveau d'exigence (le projet est parti d'un simple planning personnel ; c'est moi qui ai demandé d'en faire une application sécurisée de bout en bout et un projet de portfolio), arbitrer les choix d'architecture et de sécurité (Supabase et RLS, 2FA imposée par la base, hébergement avec en-têtes HTTP, modèle de menace), tester chaque livraison en conditions réelles et en vérifier le résultat, vérifier les affirmations de l'IA sur l'infrastructure réelle et faire corriger ses erreurs, déployer et administrer l'infrastructure (Supabase, Cloudflare, GitHub) et sécuriser les comptes associés.
 - **Le rôle de Claude** : écrire le code, les tests et la documentation, proposer des options et en expliquer les compromis.
 
-Tout le code passe par les mêmes garde-fous : lint, typage, tests unitaires et de bout en bout à chaque push.
+Tout le code passe par les mêmes garde-fous : lint, typage, tests unitaires et de bout en bout à chaque push sur `main`.
 
 ## Licence
 

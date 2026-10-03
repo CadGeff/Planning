@@ -7,6 +7,9 @@ import { closeMenu } from "./menu.js";
 
 /** Longueur minimale côté interface ; Supabase applique en plus sa propre règle. */
 const PASSWORD_MIN = 12;
+/** La révocation des autres sessions n'a pas été confirmée par le serveur. */
+const OTHERS_KEPT =
+  "Les autres appareils n'ont pas pu être déconnectés : utilise « Se déconnecter » pour fermer toutes les sessions.";
 /** Un code TOTP saisi avec ou sans espace (Aegis affiche « 123 456 »). */
 export const normalizeCode = (s) => s.replace(/\s/g, "");
 export const isValidCode = (s) => /^\d{6}$/.test(s);
@@ -46,9 +49,10 @@ async function submitPw(e) {
   btn.disabled = true;
   btn.textContent = "Changement…";
   try {
-    await Store.changePassword(p1);
+    const revoked = await Store.changePassword(p1);
     closePw();
-    setStatus("Mot de passe changé. Les autres appareils ont été déconnectés.");
+    if (revoked) setStatus("Mot de passe changé. Les autres appareils ont été déconnectés.");
+    else setStatus(`Mot de passe changé. ${OTHERS_KEPT}`, true);
   } catch (ex) {
     fail(ex.message || "Changement impossible.");
   } finally {
@@ -144,8 +148,9 @@ async function startEnroll() {
     ok.disabled = true;
     try {
       await Store.mfaVerify(en.factorId, c);
-      await Store.signOutOthers();
-      setStatus("Double authentification activée. Les autres appareils devront se reconnecter avec le code.");
+      if (await Store.signOutOthers())
+        setStatus("Double authentification activée. Les autres appareils devront se reconnecter avec le code.");
+      else setStatus(`Double authentification activée. ${OTHERS_KEPT}`, true);
       mfaErr("");
       showEnabled(en.factorId);
     } catch (ex) {

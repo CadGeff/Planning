@@ -35,7 +35,8 @@ comment on column public.items.skipped is 'Occurrences retirées de la série : 
 create index if not exists items_user_id_idx on public.items (user_id);
 
 -- ----------------------------------------------------------- updated_at
-create or replace function public.items_touch_updated_at()
+-- Une seule fonction pour les deux tables : la date de modification est posée par la base.
+create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
 set search_path = ''
@@ -49,7 +50,10 @@ $$;
 drop trigger if exists items_touch_updated_at on public.items;
 create trigger items_touch_updated_at
   before update on public.items
-  for each row execute function public.items_touch_updated_at();
+  for each row execute function public.touch_updated_at();
+
+-- Ancienne fonction propre à items, remplacée par la fonction commune ci-dessus.
+drop function if exists public.items_touch_updated_at();
 
 -- -------------------------------------------------- Row Level Security
 -- Chaque utilisateur ne voit et ne modifie que ses propres lignes.
@@ -92,17 +96,6 @@ create table if not exists public.settings (
 
 comment on table public.settings is 'Semainier : réglages synchronisés de chaque utilisateur.';
 comment on column public.settings.cat_labels is 'Nom de chaque couleur : { "bleu": "Travail", … }.';
-
-create or replace function public.touch_updated_at()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-begin
-  new.updated_at := now();
-  return new;
-end;
-$$;
 
 drop trigger if exists settings_touch_updated_at on public.settings;
 create trigger settings_touch_updated_at

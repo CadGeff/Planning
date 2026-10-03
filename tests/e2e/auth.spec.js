@@ -69,6 +69,22 @@ test("changement de mot de passe : validations, refus serveur, puis succès", as
   expect(s.log.some((r) => r.path === "/auth/v1/logout" && r.search === "?scope=others")).toBe(true);
 });
 
+test("mot de passe changé mais autres sessions non fermées : le message le dit", async ({ page }) => {
+  const s = await mockSupabase(page, { fail: { logout: 1 } });
+  await login(page);
+  await openMenu(page);
+  await page.getByRole("menuitem", { name: "Changer le mot de passe" }).click();
+  await page.getByLabel("Nouveau mot de passe").fill("Un-mot-de-passe-solide-1");
+  await page.getByLabel("Confirmation").fill("Un-mot-de-passe-solide-1");
+  await page.getByRole("button", { name: "Changer", exact: true }).click();
+  await expect(page.locator("#pwScrim")).toBeHidden();
+  const toast = page.locator(".toast").last();
+  await expect(toast).toContainText("Mot de passe changé");
+  await expect(toast).toContainText("n'ont pas pu être déconnectés");
+  await expect(toast).toHaveClass(/warn/);
+  expect(s.log.some((r) => r.path === "/auth/v1/logout" && r.search === "?scope=others")).toBe(true);
+});
+
 test("activation puis désactivation de la double authentification", async ({ page }) => {
   const s = await mockSupabase(page);
   await login(page);
@@ -145,6 +161,26 @@ test("session conservée au rechargement", async ({ page }) => {
   await page.reload();
   await expect(page.locator("#app")).toBeVisible();
   await expect(page.locator("#login")).toBeHidden();
+});
+
+test("déconnexion sans réponse du serveur : cet appareil seulement, et le message le dit", async ({ page }) => {
+  await mockSupabase(page, { fail: { logout: 1 } });
+  await login(page);
+  await expect(page.locator("#app")).toBeVisible();
+  await openMenu(page);
+  await page.getByRole("menuitem", { name: "Se déconnecter (tous les appareils)" }).click();
+  await expect(page.locator("#loginForm")).toBeVisible();
+  await expect(page.locator(".toast").last()).toContainText("Déconnecté sur cet appareil seulement");
+});
+
+test("refuse aussi une clé service_role au format JWT", async ({ page }) => {
+  // Jeton factice, sans signature valide : seul le rôle déclaré compte.
+  const part = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const key = `${part({ alg: "HS256", typ: "JWT" })}.${part({ role: "service_role", iss: "supabase" })}.signature`;
+  const s = await mockSupabase(page, { key });
+  await page.goto("/");
+  await expect(page.locator(".toast").last()).toContainText("clé secrète");
+  expect(s.log).toEqual([]);
 });
 
 test("refuse de démarrer avec une clé secrète dans config.js", async ({ page }) => {

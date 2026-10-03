@@ -32,7 +32,7 @@ export async function mockSupabase(page, init = {}) {
     settings: null,
     log: [],
     samePasswordOnce: false,
-    // Nombre de requêtes à faire échouer (panne passagère) : { itemsGet, itemsPost }.
+    // Nombre de requêtes à faire échouer (panne passagère) : { itemsGet, itemsPost, logout }.
     // supabase-js retente seul une lecture en échec : une seule panne en lecture reste invisible.
     fail: {},
     slowItemsGet: 0,
@@ -101,7 +101,13 @@ export async function mockSupabase(page, init = {}) {
       }
       return json(route, 200, user());
     }
-    if (p === "/auth/v1/logout") return route.fulfill({ status: 204, body: "" });
+    if (p === "/auth/v1/logout") {
+      if (state.fail.logout > 0) {
+        state.fail.logout--;
+        return json(route, 503, { message: "Service Unavailable" });
+      }
+      return route.fulfill({ status: 204, body: "" });
+    }
     if (p === "/auth/v1/factors" && m === "POST") {
       state.factors.push({
         id: "factor-1",
@@ -164,6 +170,11 @@ export async function mockSupabase(page, init = {}) {
       }
     }
     if (p === "/rest/v1/settings") {
+      // Même politique restrictive que sur items : aucune ligne lue, écriture refusée.
+      if (!mfaOk())
+        return m === "GET"
+          ? route.fulfill({ status: 200, contentType: "application/json", body: "null" })
+          : json(route, 403, { code: "42501", message: "new row violates row-level security policy" });
       if (m === "GET")
         return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(state.settings) });
       state.settings = { cat_labels: body.cat_labels };

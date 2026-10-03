@@ -100,7 +100,12 @@ async function enterApp(opts = {}) {
 }
 
 export async function signOut() {
-  await Store.signOut();
+  const everywhere = await Store.signOut();
+  if (!everywhere)
+    setStatus(
+      "Déconnecté sur cet appareil seulement : le serveur n'a pas répondu. Pour fermer les autres sessions, reconnecte-toi puis déconnecte-toi à nouveau.",
+      true,
+    );
 }
 
 async function submitLogin(e) {
@@ -196,7 +201,7 @@ export async function boot() {
     if (await codeRequired()) return;
     checked = true;
   } catch {
-    /* hors ligne : on tente quand même d'afficher le cache */
+    /* hors ligne : on ouvre quand même l'interface ; le chargement signalera l'erreur */
   }
   await enterApp({ mfaChecked: checked });
   if (configError) setStatus(configError, true);

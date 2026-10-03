@@ -3,8 +3,8 @@
  * Laisse les deux champs vides pour le MODE LOCAL : les données restent dans ce
  * navigateur (pratique pour tester, pas de synchro entre appareils).
  *
- * Renseigne-les pour le MODE SUPABASE (voir README, étape 3) :
- *   supabaseUrl : Project Settings → API → Project URL
+ * Renseigne-les pour le MODE SUPABASE (voir README, étape 2) :
+ *   supabaseUrl : bouton Connect du projet, ou Project Settings → API Keys
  *   supabaseKey : la clé « publishable » (sb_publishable_…) ou, sur un ancien projet, la clé « anon ».
  *
  * Ces deux valeurs sont publiques par conception : elles finissent dans le navigateur
